@@ -1,0 +1,54 @@
+<div class="page">
+  <a routerLink="/food-categories" class="back">← Back to categories</a>
+  <h1>New food category</h1>
+  <p class="hint">
+    Creates a row via <code>POST /api/food-categories</code> with
+    <span class="mono">code</span>, optional <span class="mono">name</span>, and
+    <span class="mono">version</span> <code>0</code>.
+  </p>
+
+  @if (errorMessage(); as msg) {
+    <p class="error-banner" role="alert">{{ msg }}</p>
+  }
+
+  <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    <div class="field" [class.invalid]="form.controls.code.invalid && form.controls.code.touched">
+      <label for="fc-code">Code</label>
+      <input
+        id="fc-code"
+        type="text"
+        formControlName="code"
+        autocomplete="off"
+        spellcheck="false"
+        maxlength="255"
+        placeholder="e.g. BEV-HOT"
+        [readonly]="submitting()"
+      />
+      @if (form.controls.code.invalid && form.controls.code.touched) {
+        <span class="err">Enter a unique code (not only spaces).</span>
+      }
+    </div>
+
+    <div class="field" [class.invalid]="form.controls.name.invalid && form.controls.name.touched">
+      <label for="fc-name">Name (optional)</label>
+      <input
+        id="fc-name"
+        type="text"
+        formControlName="name"
+        autocomplete="off"
+        maxlength="255"
+        placeholder="e.g. Hot beverages"
+        [readonly]="submitting()"
+      />
+      @if (form.controls.name.invalid && form.controls.name.touched) {
+        <span class="err">Name is too long.</span>
+      }
+    </div>
+
+    <div class="actions">
+      <button type="submit" [disabled]="submitting() || form.invalid">
+        {{ submitting() ? 'Saving…' : 'Create category' }}
+      </button>
+    </div>
+  </form>
+</div>

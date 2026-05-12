@@ -1,0 +1,88 @@
+<div class="page">
+  <button type="button" class="back-btn" (click)="backToOrder()">
+    ← {{ isExistingOrderFlow() ? 'Back to orders' : 'Back to new order' }}
+  </button>
+  <h1>Pick food by picture</h1>
+  <p class="hint">{{ pickerHint() }}</p>
+  @if (notice(); as msg) {
+    <p class="notice">{{ msg }}</p>
+  }
+  @if (from !== 'orders') {
+    <p class="pending">Pending lines: <span class="mono">{{ pendingCount() }}</span></p>
+  }
+  @if (pendingCount() > 0) {
+    <div class="pending-list">
+      @for (it of pendingItems(); track it.foodId) {
+        <div class="pending-item">
+          <div class="pending-main">
+            <span class="mono">{{ it.qty }}x</span> {{ it.label }}
+          </div>
+          <div class="pending-actions">
+            <button type="button" class="qty-btn" (click)="decreasePendingQty(it.foodId)">−</button>
+            <button type="button" class="qty-btn" (click)="increasePendingQty(it.foodId)">+</button>
+          </div>
+        </div>
+      }
+    </div>
+  }
+
+  <div class="toolbar">
+    <input
+      type="search"
+      placeholder="Search food or category..."
+      [value]="search()"
+      (input)="search.set($any($event.target).value)"
+    />
+    <input
+      type="number"
+      min="1"
+      step="1"
+      class="qty"
+      [value]="qty()"
+      (input)="qty.set($any($event.target).value)"
+      title="Quantity for picked line"
+    />
+  </div>
+
+  <div class="category-toolbar">
+    <button
+      type="button"
+      class="cat-btn"
+      [class.active]="selectedCategoryKey() === 'ALL'"
+      (click)="selectCategory('ALL')"
+    >
+      All
+    </button>
+    @for (c of categoryButtons(); track c.key) {
+      <button
+        type="button"
+        class="cat-btn"
+        [class.active]="selectedCategoryKey() === c.key"
+        (click)="selectCategory(c.key)"
+      >
+        {{ c.label }}
+      </button>
+    }
+  </div>
+
+  <div class="grid">
+    @for (f of filteredFoods(); track f.id ?? $index) {
+      <button type="button" class="card" (click)="pick(f)">
+        @if (pictureSrc(f); as src) {
+          <img [src]="src" alt="" />
+        } @else {
+          <div class="no-pic">No image</div>
+        }
+        <div class="name">{{ foodPickerLabel(f) }}</div>
+        <div class="price">{{ f.basePrice | number: '1.2-2' }}</div>
+      </button>
+    } @empty {
+      <p class="empty">No foods found.</p>
+    }
+  </div>
+  <div class="confirm-row">
+    <button type="button" class="confirm-btn" [disabled]="pendingCount() < 1" (click)="confirmSave()">
+      Confirm
+    </button>
+  </div>
+</div>

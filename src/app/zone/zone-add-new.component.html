@@ -1,0 +1,51 @@
+<div class="page">
+  <a routerLink="/zones" class="back">← Back to zones</a>
+  <h1>Add zone</h1>
+  <p class="hint">
+    Creates a zone via <code>POST /api/zones</code>, then uploads a required photo with
+    <code>POST /api/zones/&#123;id&#125;/picture</code> (JPEG, PNG, GIF, or WebP). If the upload fails, the new zone row is removed.
+  </p>
+
+  @if (errorMessage(); as msg) {
+    <p class="error-banner" role="alert">{{ msg }}</p>
+  }
+
+  <form [formGroup]="form" (ngSubmit)="submit()">
+    <div class="field" [class.invalid]="form.controls.code.invalid && form.controls.code.touched">
+      <label for="code">Code</label>
+      <input id="code" type="text" formControlName="code" autocomplete="off" placeholder="e.g. DINING-A" />
+      @if (form.controls.code.invalid && form.controls.code.touched) {
+        <span class="err">Code is required.</span>
+      }
+    </div>
+
+    <div class="field" [class.invalid]="form.controls.name.invalid && form.controls.name.touched">
+      <label for="zone-name">Name</label>
+      <input id="zone-name" type="text" formControlName="name" autocomplete="off" maxlength="255" placeholder="e.g. Main dining" />
+      @if (form.controls.name.invalid && form.controls.name.touched) {
+        <span class="err">Name is required.</span>
+      }
+    </div>
+
+    <div class="field" [class.invalid]="pictureRequiredHint() && !pendingPicture()">
+      <label for="zone-picture">Photo <span class="req">(required)</span></label>
+      <input
+        id="zone-picture"
+        type="file"
+        accept="image/jpeg,image/png,image/gif,image/webp"
+        (change)="onPictureSelected($event)"
+      />
+      @if (pendingPicture(); as pic) {
+        <p class="hint-inline">{{ pic.name }} — <button type="button" class="linkish" (click)="clearPendingPicture()">Remove</button></p>
+      } @else if (pictureRequiredHint()) {
+        <span class="err">Choose a photo for this zone.</span>
+      }
+    </div>
+
+    <div class="actions">
+      <button type="submit" [disabled]="submitting() || !canSubmit()">
+        {{ submitting() ? 'Saving…' : 'Create zone' }}
+      </button>
+    </div>
+  </form>
+</div>

@@ -1,0 +1,166 @@
+<div class="page">
+  <a routerLink="/foods" class="back">← Back to foods</a>
+  <h1>Edit food</h1>
+  <p class="hint">
+    Updates via <code>PUT /api/foods/&#123;id&#125;</code>. Kitchen and category behave like on Add food; include the current
+    <span class="mono">version</span> from the server for optimistic locking.
+  </p>
+
+  @if (loading()) {
+    <p class="status">Loading…</p>
+  } @else if (loadError(); as le) {
+    <p class="error-banner" role="alert">{{ le }}</p>
+  } @else {
+    @if (saveError(); as se) {
+      <p class="error-banner" role="alert">{{ se }}</p>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="submit()">
+      <div class="field" [class.invalid]="form.controls.code.invalid && form.controls.code.touched">
+        <label for="food-edit-code">Code</label>
+        <input id="food-edit-code" type="text" formControlName="code" autocomplete="off" placeholder="e.g. BRG-CLSC" />
+        @if (form.controls.code.invalid && form.controls.code.touched) {
+          <span class="err">Code is required.</span>
+        }
+      </div>
+
+      <div class="field" [class.invalid]="form.controls.name.invalid && form.controls.name.touched">
+        <label for="food-edit-name">Name</label>
+        <input id="food-edit-name" type="text" formControlName="name" autocomplete="off" placeholder="e.g. Classic burger" />
+        @if (form.controls.name.invalid && form.controls.name.touched) {
+          <span class="err">Name is required.</span>
+        }
+      </div>
+
+      <div class="field" [class.invalid]="form.controls.basePrice.invalid && form.controls.basePrice.touched">
+        <label for="food-edit-basePrice">Base price</label>
+        <input id="food-edit-basePrice" type="number" formControlName="basePrice" min="0" step="0.01" />
+        @if (form.controls.basePrice.invalid && form.controls.basePrice.touched) {
+          <span class="err">Enter a price ≥ 0.</span>
+        }
+      </div>
+
+      <div class="field" [class.invalid]="form.controls.kitchenId.invalid && form.controls.kitchenId.touched">
+        <label for="kitchen-select">Kitchen</label>
+        @if (lookups().kitchens.length > 0) {
+          <div class="pick-with-search">
+            <label class="label-text" for="kitchen-search">Find kitchen (name, code, or id)</label>
+            <input
+              id="kitchen-search"
+              type="search"
+              autocomplete="off"
+              placeholder="Type kitchen name, code, or id…"
+              [value]="kitchenSearch()"
+              (input)="kitchenSearch.set($any($event.target).value)"
+            />
+            @if (filterKitchens(lookups().kitchens).length === 0) {
+              <p class="filter-empty">No kitchens match — clear search to see all.</p>
+            }
+            <select id="kitchen-select" formControlName="kitchenId" aria-label="Kitchen, value is id">
+              <option value="" disabled>Choose kitchen…</option>
+              @for (k of filterKitchens(lookups().kitchens); track k.id) {
+                <option [value]="k.id">{{ kitchenOptionLabel(k) }}</option>
+              }
+            </select>
+          </div>
+        } @else {
+          <div class="pick-with-search">
+            <label class="label-text" for="kitchen-manual">Kitchen (name, code, or id)</label>
+            <input
+              id="kitchen-manual"
+              type="text"
+              formControlName="manualKitchenQuery"
+              autocomplete="off"
+              placeholder="e.g. Main kitchen, KT-001, or 1"
+            />
+            <p class="hint-inline">Resolved on save with <code>GET /api/kitchens?q=</code>.</p>
+          </div>
+        }
+        @if (form.controls.kitchenId.invalid && form.controls.kitchenId.touched) {
+          <span class="err">Kitchen is required.</span>
+        }
+      </div>
+
+      <div class="field" [class.invalid]="form.controls.foodCategoryId.invalid && form.controls.foodCategoryId.touched">
+        <label for="category-select">Category</label>
+        @if (lookups().categories.length > 0) {
+          <div class="pick-with-search">
+            <label class="label-text" for="category-search">Find category</label>
+            <input
+              id="category-search"
+              type="search"
+              autocomplete="off"
+              placeholder="Type category name, code, or id…"
+              [value]="categorySearch()"
+              (input)="categorySearch.set($any($event.target).value)"
+            />
+            @if (filterCategories(lookups().categories).length === 0) {
+              <p class="filter-empty">No categories match — clear search to see all.</p>
+            }
+            <select id="category-select" formControlName="foodCategoryId" aria-label="Category, value is id">
+              <option value="" disabled>Choose category…</option>
+              @for (c of filterCategories(lookups().categories); track c.id) {
+                <option [value]="c.id">{{ categoryOptionLabel(c) }}</option>
+              }
+            </select>
+          </div>
+        } @else {
+          <input
+            id="category-id-manual"
+            type="number"
+            formControlName="foodCategoryId"
+            min="1"
+            step="1"
+            placeholder="Category id"
+          />
+        }
+        @if (form.controls.foodCategoryId.invalid && form.controls.foodCategoryId.touched) {
+          <span class="err">Category is required.</span>
+        }
+      </div>
+
+      <div class="field">
+        <label>Picture</label>
+        @if (currentPictureSrc(); as ps) {
+          <div class="picture-row">
+            <img [src]="ps" alt="" class="food-photo-preview" width="120" height="120" />
+          </div>
+        } @else {
+          <p class="hint-inline">No image yet — choose a file and upload.</p>
+        }
+        <input
+          #pictureInput
+          type="file"
+          accept="image/jpeg,image/png,image/gif,image/webp"
+          (change)="onPictureFileChange($event)"
+        />
+        @if (pictureUploadError(); as pue) {
+          <p class="err" role="alert">{{ pue }}</p>
+        }
+        <div class="picture-actions">
+          <button
+            type="button"
+            [disabled]="pictureUploading() || pictureFile() == null"
+            (click)="uploadPicture(pictureInput)"
+          >
+            {{ pictureUploading() ? 'Uploading…' : 'Upload / replace image' }}
+          </button>
+        </div>
+      </div>
+
+      <div class="field" [class.invalid]="form.controls.version.invalid && form.controls.version.touched">
+        <label for="food-edit-version">Version</label>
+        <input id="food-edit-version" type="number" formControlName="version" min="0" step="1" />
+        @if (form.controls.version.invalid && form.controls.version.touched) {
+          <span class="err">Version must be a non‑negative integer from the server.</span>
+        }
+      </div>
+
+      <div class="actions">
+        <button type="submit" [disabled]="submitting() || !canSubmitForm()">
+          {{ submitting() ? 'Saving…' : 'Save changes' }}
+        </button>
+      </div>
+    </form>
+  }
+</div>

@@ -1,0 +1,16 @@
+[
+  {
+    "id": 1,
+    "code": "T-01",
+    "basePrice": 0,
+    "version": 0,
+    "zone": { "id": 1, "code": "DINING-A", "name": "Dining A", "version": 0 }
+  },
+  {
+    "id": 2,
+    "code": "T-02",
+    "basePrice": 0,
+    "version": 0,
+    "zone": { "id": 1, "code": "DINING-A", "name": "Dining A", "version": 0 }
+  }
+]

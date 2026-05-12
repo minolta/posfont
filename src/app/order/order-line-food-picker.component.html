@@ -1,0 +1,44 @@
+<div class="page">
+  <a
+    [routerLink]="['/orders/new']"
+    [queryParams]="{ tableId: tableId }"
+    class="back"
+    >← Back to new order</a
+  >
+  <h1>Pick food by picture</h1>
+  <p class="hint">Click a food card to add it as a new order line.</p>
+
+  <div class="toolbar">
+    <input
+      type="search"
+      placeholder="Search food name..."
+      [value]="search()"
+      (input)="search.set($any($event.target).value)"
+    />
+    <input
+      type="number"
+      min="1"
+      step="1"
+      class="qty"
+      [value]="qty()"
+      (input)="qty.set($any($event.target).value)"
+      title="Quantity for picked line"
+    />
+  </div>
+
+  <div class="grid">
+    @for (f of filteredFoods(); track f.id ?? $index) {
+      <button type="button" class="card" (click)="pick(f)">
+        @if (pictureSrc(f); as src) {
+          <img [src]="src" alt="" />
+        } @else {
+          <div class="no-pic">No image</div>
+        }
+        <div class="name">{{ foodPickerLabel(f) }}</div>
+        <div class="price">{{ f.basePrice | number: '1.2-2' }}</div>
+      </button>
+    } @empty {
+      <p class="empty">No foods found.</p>
+    }
+  </div>
+</div>

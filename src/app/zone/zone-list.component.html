@@ -1,0 +1,134 @@
+<div class="zone-list-page">
+  <h1>Zones</h1>
+  <p class="hint">
+    Search matches <span class="mono">code</span> or <span class="mono">name</span> on the server (<code>GET /api/zones?q=</code>). New zones require a photo on the Add form.
+  </p>
+
+  @if (createdId(); as cid) {
+    <p class="success-banner">
+      Zone <span class="mono">#{{ cid }}</span> was created.
+      <a routerLink="/zones">Dismiss</a>
+    </p>
+  }
+  @if (updatedId(); as uid) {
+    <p class="success-banner success-banner--muted">
+      Zone <span class="mono">#{{ uid }}</span> was updated.
+      <a routerLink="/zones">Dismiss</a>
+    </p>
+  }
+
+  <div class="toolbar">
+    <div class="search-field">
+      <label class="label-text" for="zone-search">Search</label>
+      <input
+        id="zone-search"
+        type="search"
+        autocomplete="off"
+        placeholder="Code or name contains…"
+        [value]="searchTerm()"
+        (input)="onSearchInput($any($event.target).value)"
+      />
+    </div>
+    @if (loading()) {
+      <span class="status" aria-live="polite">Loading…</span>
+    }
+    <a routerLink="/zones/new" class="add-link">Add zone</a>
+  </div>
+
+  @if (error(); as err) {
+    <p class="error" role="alert">{{ err }}</p>
+  }
+  @if (deleteError(); as delErr) {
+    <p class="error" role="alert">{{ delErr }}</p>
+  }
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th class="col-photo">Thumb</th>
+          <th>Code</th>
+          <th>Name</th>
+          <th>Ver.</th>
+          <th class="col-actions">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        @if (loading() && zones().length === 0) {
+          <tr>
+            <td class="empty" colspan="6">Loading…</td>
+          </tr>
+        }
+        @for (z of zones(); track z.id ?? $index) {
+          <tr>
+            <td class="mono">{{ z.id }}</td>
+            <td class="col-photo">
+              @if (pictureSrc(z); as src) {
+                <button
+                  type="button"
+                  class="zone-thumb-btn"
+                  (click)="openLightbox(z)"
+                  [attr.aria-label]="'View larger photo: ' + (z.name?.trim() || z.code)"
+                >
+                  <span class="zone-thumb-wrap" title="Click to enlarge">
+                    <img
+                      [src]="src"
+                      alt=""
+                      class="zone-thumb"
+                      loading="lazy"
+                      decoding="async"
+                      (error)="onPictureError(z)"
+                    />
+                  </span>
+                </button>
+              } @else {
+                <span class="zone-thumb-placeholder" title="No photo"></span>
+              }
+            </td>
+            <td class="mono">{{ z.code }}</td>
+            <td>{{ z.name?.trim() || '—' }}</td>
+            <td class="mono">{{ z.version }}</td>
+            <td class="col-actions">
+              @if (z.id != null) {
+                <a [routerLink]="['/zones', z.id, 'edit']" class="edit-link">Edit</a>
+                <button
+                  type="button"
+                  class="delete-btn"
+                  [disabled]="deletingId() === z.id"
+                  (click)="deleteZone(z)"
+                >
+                  {{ deletingId() === z.id ? 'Deleting…' : 'Delete' }}
+                </button>
+              }
+            </td>
+          </tr>
+        } @empty {
+          @if (!loading()) {
+            <tr>
+              <td class="empty" colspan="6">No zones found.</td>
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+  </div>
+
+  @if (lightboxZone(); as lz) {
+    <div
+      class="zone-lightbox-overlay"
+      role="dialog"
+      aria-modal="true"
+      [attr.aria-label]="'Photo: ' + (lz.name?.trim() || lz.code)"
+      (click)="onLightboxBackdropClick($event)"
+    >
+      <div class="zone-lightbox-panel" (click)="$event.stopPropagation()">
+        <button type="button" class="zone-lightbox-close" (click)="closeLightbox()" aria-label="Close">×</button>
+        @if (pictureSrc(lz); as bigSrc) {
+          <img [src]="bigSrc" class="zone-lightbox-img" [alt]="lz.name?.trim() || lz.code" />
+        }
+        <p class="zone-lightbox-caption">{{ lz.name?.trim() || lz.code }}</p>
+      </div>
+    </div>
+  }
+</div>

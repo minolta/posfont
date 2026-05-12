@@ -1,0 +1,18 @@
+[
+  {
+    "id": 1,
+    "code": "BRG-CLSC",
+    "basePrice": 8.99,
+    "kitchen": { "id": 1, "code": "MAIN", "version": 0 },
+    "foodCategory": { "id": 1, "code": "MAINS", "version": 0 },
+    "version": 0
+  },
+  {
+    "id": 2,
+    "code": "SAL-CAES",
+    "basePrice": 7.49,
+    "kitchen": { "id": 1, "code": "MAIN", "version": 0 },
+    "foodCategory": { "id": 2, "code": "SALADS", "version": 0 },
+    "version": 0
+  }
+]

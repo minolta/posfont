@@ -1,0 +1,175 @@
+<div class="food-list-page">
+  <h1>Foods</h1>
+  <p class="hint">
+    Search matches <span class="mono">code</span> or <span class="mono">name</span> on the server (<code>GET /api/foods?q=</code>).
+  </p>
+
+  @if (createdId(); as cid) {
+    <p class="success-banner">
+      Food <span class="mono">#{{ cid }}</span> was created.
+      <a routerLink="/foods">Dismiss</a>
+    </p>
+  }
+  @if (updatedId(); as uid) {
+    <p class="success-banner success-banner--muted">
+      Food <span class="mono">#{{ uid }}</span> was updated.
+      <a routerLink="/foods">Dismiss</a>
+    </p>
+  }
+
+  <div class="toolbar">
+    <div class="search-field">
+      <label class="label-text" for="food-search">Search</label>
+      <input
+        id="food-search"
+        type="search"
+        autocomplete="off"
+        placeholder="Code or name contains…"
+        [value]="searchTerm()"
+        (input)="onSearchInput($any($event.target).value)"
+      />
+    </div>
+    @if (loading()) {
+      <span class="status" aria-live="polite">Loading…</span>
+    }
+    <a routerLink="/foods/new" class="add-link">Add food</a>
+  </div>
+
+  @if (error(); as err) {
+    <p class="error" role="alert">{{ err }}</p>
+  }
+  @if (deleteError(); as delErr) {
+    <p class="error" role="alert">{{ delErr }}</p>
+  }
+
+  <div class="category-filter" role="group" aria-label="Filter by category">
+    <span class="category-filter-label">Category</span>
+    <div class="category-chips">
+      <button
+        type="button"
+        class="category-chip"
+        [class.category-chip--active]="selectedCategoryId() === null"
+        (click)="selectCategoryFilter(null)"
+      >
+        All
+      </button>
+      @for (cat of allCategories(); track cat.id ?? cat.code + $index) {
+        @if (cat.id != null) {
+          <button
+            type="button"
+            class="category-chip"
+            [class.category-chip--active]="selectedCategoryId() === cat.id"
+            [attr.title]="categoryCell(cat)"
+            (click)="selectCategoryFilter(cat.id)"
+          >
+            {{ categoryCell(cat) }}
+          </button>
+        }
+      }
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th class="col-photo">Thumb</th>
+          <th>Code</th>
+          <th>Name</th>
+          <th>Base price</th>
+          <th>Kitchen</th>
+          <th>Category</th>
+          <th>Ver.</th>
+          <th class="col-actions">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        @if (loading() && foods().length === 0) {
+          <tr>
+            <td class="empty" colspan="9">Loading…</td>
+          </tr>
+        }
+        @for (food of displayedFoods(); track food.id ?? $index) {
+          <tr>
+            <td class="mono">{{ food.id }}</td>
+            <td class="col-photo">
+              @if (pictureSrc(food); as src) {
+                <button
+                  type="button"
+                  class="food-thumb-btn"
+                  (click)="openLightbox(food)"
+                  [attr.aria-label]="'View larger photo: ' + (food.name?.trim() || food.code)"
+                >
+                  <span class="food-thumb-wrap" title="Click to enlarge">
+                    <img
+                      [src]="src"
+                      alt=""
+                      class="food-thumb"
+                      loading="lazy"
+                      decoding="async"
+                      (error)="onPictureError(food)"
+                    />
+                  </span>
+                </button>
+              } @else {
+                <span class="food-thumb-placeholder" title="No photo"></span>
+              }
+            </td>
+            <td class="mono">{{ food.code }}</td>
+            <td>{{ food.name?.trim() || '—' }}</td>
+            <td>{{ food.basePrice | number: '1.2-2' }}</td>
+            <td>{{ kitchenCell(food.kitchen) }}</td>
+            <td>{{ categoryCell(food.foodCategory) }}</td>
+            <td class="mono">{{ food.version }}</td>
+            <td class="col-actions">
+              @if (food.id != null) {
+                <a [routerLink]="['/foods', food.id, 'edit']" class="edit-link">Edit</a>
+                <button
+                  type="button"
+                  class="delete-btn"
+                  [disabled]="deletingId() === food.id"
+                  (click)="deleteFood(food)"
+                >
+                  {{ deletingId() === food.id ? 'Deleting…' : 'Delete' }}
+                </button>
+              }
+            </td>
+          </tr>
+        } @empty {
+          @if (!loading()) {
+            <tr>
+              <td class="empty" colspan="9">
+                @if (foods().length > 0) {
+                  No foods in this category for the current search.
+                } @else {
+                  No foods found.
+                }
+              </td>
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+  </div>
+
+  @if (lightboxFood(); as lf) {
+    <div
+      class="food-lightbox-overlay"
+      role="dialog"
+      aria-modal="true"
+      [attr.aria-label]="'Photo: ' + (lf.name?.trim() || lf.code)"
+      (click)="onLightboxBackdropClick($event)"
+    >
+      <div class="food-lightbox-panel" (click)="$event.stopPropagation()">
+        <button type="button" class="food-lightbox-close" (click)="closeLightbox()" aria-label="Close">
+          ×
+        </button>
+        @if (pictureSrc(lf); as bigSrc) {
+          <img [src]="bigSrc" class="food-lightbox-img" [alt]="lf.name?.trim() || lf.code" />
+        }
+        <p class="food-lightbox-caption">{{ lf.name?.trim() || lf.code }}</p>
+      </div>
+    </div>
+  }
+</div>

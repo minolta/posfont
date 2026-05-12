@@ -1,0 +1,79 @@
+<div class="kitchen-list-page">
+  <h1>Kitchens</h1>
+  <p class="hint">Search matches <span class="mono">code</span> on the server (<code>GET /api/kitchens?q=</code>).</p>
+
+  @if (createdId(); as cid) {
+    <p class="success-banner">
+      Kitchen <span class="mono">#{{ cid }}</span> was created.
+      <a routerLink="/kitchens">Dismiss</a>
+    </p>
+  }
+  @if (updatedId(); as uid) {
+    <p class="success-banner success-banner--muted">
+      Kitchen <span class="mono">#{{ uid }}</span> was updated.
+      <a routerLink="/kitchens">Dismiss</a>
+    </p>
+  }
+
+  <div class="toolbar">
+    <div class="search-field">
+      <label class="label-text" for="kitchen-search">Search</label>
+      <input
+        id="kitchen-search"
+        type="search"
+        autocomplete="off"
+        placeholder="Code contains…"
+        [value]="searchTerm()"
+        (input)="onSearchInput($any($event.target).value)"
+      />
+    </div>
+    @if (loading()) {
+      <span class="status" aria-live="polite">Loading…</span>
+    }
+    <a routerLink="/kitchens/new" class="add-link">Add kitchen</a>
+  </div>
+
+  @if (error(); as err) {
+    <p class="error" role="alert">{{ err }}</p>
+  }
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Code</th>
+          <th>Name</th>
+          <th>Ver.</th>
+          <th class="col-actions">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        @if (loading() && kitchens().length === 0) {
+          <tr>
+            <td class="empty" colspan="5">Loading…</td>
+          </tr>
+        }
+        @for (k of kitchens(); track k.id ?? $index) {
+          <tr>
+            <td class="mono">{{ k.id }}</td>
+            <td class="mono">{{ k.code }}</td>
+            <td>{{ k.name }}</td>
+            <td class="mono">{{ k.version }}</td>
+            <td class="col-actions">
+              @if (k.id != null) {
+                <a [routerLink]="['/kitchens', k.id, 'edit']" class="edit-link">Edit</a>
+              }
+            </td>
+          </tr>
+        } @empty {
+          @if (!loading()) {
+            <tr>
+              <td class="empty" colspan="5">No kitchens found.</td>
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+  </div>
+</div>

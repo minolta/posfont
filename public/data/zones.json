@@ -1,0 +1,14 @@
+[
+  {
+    "id": 1,
+    "code": "DINING-A",
+    "basePrice": 0,
+    "version": 0
+  },
+  {
+    "id": 2,
+    "code": "PATIO",
+    "basePrice": 2.5,
+    "version": 0
+  }
+]

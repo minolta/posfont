@@ -1,0 +1,280 @@
+<div class="order-list-page">
+  <h1>Orders</h1>
+  <p class="hint">
+    Search matches <span class="mono">orderNo</span> on the server (<code>GET /api/orders?q=</code>). Orders have
+    <strong>lines</strong> (food + quantity); use <strong>Pay</strong> to settle (<code>POST …/pay</code>).
+  </p>
+
+  @if (createdId(); as cid) {
+    <p class="success-banner">
+      Order <span class="mono">#{{ cid }}</span> was created.
+      <a routerLink="/orders">Dismiss</a>
+    </p>
+  }
+  @if (updatedId(); as uid) {
+    <p class="success-banner success-banner--muted">
+      Order <span class="mono">#{{ uid }}</span> was updated.
+      <a routerLink="/orders">Dismiss</a>
+    </p>
+  }
+
+  <div class="toolbar">
+    <div class="search-field">
+      <label class="label-text" for="order-search">Search</label>
+      <input
+        id="order-search"
+        type="search"
+        autocomplete="off"
+        placeholder="Order number contains…"
+        [value]="searchTerm()"
+        (input)="onSearchInput($any($event.target).value)"
+      />
+    </div>
+    @if (loading()) {
+      <span class="status" aria-live="polite">Loading…</span>
+    }
+    <a routerLink="/orders/new" class="add-link">New order</a>
+  </div>
+
+  @if (error(); as err) {
+    <p class="error" role="alert">{{ err }}</p>
+  }
+  @if (deleteError(); as delErr) {
+    <p class="error" role="alert">{{ delErr }}</p>
+  }
+  @if (payError(); as pe) {
+    <p class="error" role="alert">{{ pe }}</p>
+  }
+  @if (addLineError(); as ae) {
+    <p class="error" role="alert">{{ ae }}</p>
+  }
+  @if (statusError(); as se) {
+    <p class="error" role="alert">{{ se }}</p>
+  }
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Order no.</th>
+          <th>Table</th>
+          <th>Lines</th>
+          <th>Order date</th>
+          <th>Done</th>
+          <th>Cancel</th>
+          <th>Paid</th>
+          <th>Total/Pay</th>
+          <th>Ver.</th>
+          <th class="col-actions">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        @if (loading() && orders().length === 0) {
+          <tr>
+            <td class="empty" colspan="11">Loading…</td>
+          </tr>
+        }
+        @for (o of orders(); track o.id ?? $index) {
+          <tr>
+            <td class="mono">{{ o.id }}</td>
+            <td class="mono">
+              @if (o.id != null) {
+                <a [routerLink]="['/orders', o.id, 'edit']" class="order-no-link">{{ o.orderNo }}</a>
+              } @else {
+                {{ o.orderNo }}
+              }
+            </td>
+            <td>{{ tableCell(o.table) }}</td>
+            <td class="lines-cell">
+              @if (o.lines.length > 0 && o.id != null) {
+                <button type="button" class="view-lines-btn" (click)="toggleOrderLines(o.id)">
+                  📋 {{ o.lines.length }}
+                </button>
+              } @else {
+                —
+              }
+            </td>
+            <td>{{ o.orderDate | date: 'short' }}</td>
+            <td>{{ o.complateOrder ? 'Yes' : 'No' }}</td>
+            <td>{{ o.cancel ? 'Yes' : 'No' }}</td>
+            <td>{{ o.paid ? 'Yes' : 'No' }}</td>
+            <td class="mono" [attr.title]="'Total/Get pay (exclude canceled lines)'">
+              {{ orderTotal(o) | number: '1.0-2' }}/<span class="payable-value">{{
+                payableTotal(o) | number: '1.0-2'
+              }}</span>
+            </td>
+            <td class="mono">{{ o.version }}</td>
+            <td class="col-actions">
+              @if (o.id != null) {
+                <div class="order-actions">
+                  @if (!o.paid) {
+                    <button
+                      type="button"
+                      class="pay-btn"
+                      [disabled]="payingId() === o.id"
+                      (click)="openPayDialog(o)"
+                    >
+                      {{ payingId() === o.id ? 'Paying…' : 'Pay' }}
+                    </button>
+                    @if (o.lines.length > 0) {
+                      <button
+                        type="button"
+                        class="complete-all-btn"
+                        title="Mark all non-canceled lines complete"
+                        [disabled]="!hasWaitingLines(o) || isCompleteAllUpdating(o.id)"
+                        (click)="completeAllLineStatuses(o)"
+                      >
+                        {{ isCompleteAllUpdating(o.id) ? '…' : 'Complete all' }}
+                      </button>
+                    }
+                    <button type="button" class="open-add-line-btn" (click)="openLinePickerForOrder(o)">
+                      ＋ Line
+                    </button>
+                  }
+                </div>
+              }
+            </td>
+          </tr>
+          @if (expandedOrderId() === o.id) {
+            <tr class="line-details-row">
+              <td colspan="11">
+                <div class="line-details">
+                  <div class="line-details-header">
+                    <div class="line-details-title">Order lines</div>
+                  </div>
+                  <table class="line-details-table">
+                    <thead>
+                      <tr>
+                        <th>Food</th>
+                        <th>Qty</th>
+                        <th>Unit Price</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @if (!o.paid && o.id != null && o.lines.length > 0) {
+                        <tr class="line-list-actions-row">
+                          <td colspan="4" class="line-list-actions-cell">
+                            <button
+                              type="button"
+                              class="complete-all-btn complete-all-btn--in-table"
+                              title="Mark every line complete (canceled lines stay canceled)"
+                              [disabled]="!hasWaitingLines(o) || isCompleteAllUpdating(o.id)"
+                              (click)="completeAllLineStatuses(o)"
+                            >
+                              {{
+                                isCompleteAllUpdating(o.id)
+                                  ? 'Updating…'
+                                  : hasWaitingLines(o)
+                                    ? 'Complete all'
+                                    : 'All lines done / canceled'
+                              }}
+                            </button>
+                          </td>
+                        </tr>
+                      }
+                      @for (ln of o.lines; track ln.id ?? $index; let i = $index) {
+                        <tr>
+                          <td>{{ foodLabel(ln.food) }}</td>
+                          <td>{{ ln.quantity }}</td>
+                          <td>{{ ln.unitPrice }}</td>
+                          <td>
+                            <div class="line-status-wrap">
+                            <span
+                              class="line-status"
+                              [class.wait]="lineStatus(ln, o) === 'WAIT'"
+                              [class.complete]="lineStatus(ln, o) === 'COMPLETE'"
+                              [class.cancel]="lineStatus(ln, o) === 'CANCEL'"
+                              [attr.title]="lineStatus(ln, o)"
+                              [attr.aria-label]="lineStatus(ln, o)"
+                            >
+                              {{ lineStatusIcon(lineStatus(ln, o)) }}
+                            </span>
+                            @if (!o.paid) {
+                              <button
+                                type="button"
+                                class="icon-status-btn complete"
+                                title="Set line complete"
+                                aria-label="Set line complete"
+                                [disabled]="o.id == null || isLineStatusUpdating(o.id, i) || lineStatus(ln, o) === 'COMPLETE'"
+                                (click)="changeLineStatus(o, i, 'COMPLETE')"
+                              >
+                                ✓
+                              </button>
+                              <button
+                                type="button"
+                                class="icon-status-btn cancel"
+                                title="Set line cancel"
+                                aria-label="Set line cancel"
+                                [disabled]="o.id == null || isLineStatusUpdating(o.id, i) || lineStatus(ln, o) === 'CANCEL'"
+                                (click)="changeLineStatus(o, i, 'CANCEL')"
+                              >
+                                ✕
+                              </button>
+                            }
+                            </div>
+                          </td>
+                        </tr>
+                      } @empty {
+                        <tr>
+                          <td colspan="4" class="empty">No lines.</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </td>
+            </tr>
+          }
+        } @empty {
+          @if (!loading()) {
+            <tr>
+              <td class="empty" colspan="11">No orders found.</td>
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+  </div>
+
+  @if (payDialogOrder(); as po) {
+    <div class="dialog-backdrop" (click)="closePayDialog()">
+      <div class="pay-dialog" (click)="$event.stopPropagation()">
+        <h3>Confirm payment</h3>
+        <p class="dialog-order-no">
+          Order: <span class="mono">{{ po.orderNo }}</span>
+        </p>
+        <p class="pay-total">
+          Total to pay (ignore canceled lines):
+          <span class="mono">{{ payableTotal(po) | number: '1.2-2' }}</span>
+        </p>
+        <label class="pay-input-label" for="pay-input-amount">Input total to pay</label>
+        <input
+          id="pay-input-amount"
+          type="number"
+          min="0"
+          step="0.01"
+          class="pay-input"
+          [value]="payInputAmount()"
+          [readonly]="payingId() === po.id"
+          (focus)="$any($event.target).select()"
+          (click)="$any($event.target).select()"
+          (input)="setPayInputAmount($any($event.target).value)"
+        />
+        <div class="dialog-actions">
+          <button
+            type="button"
+            class="pay-btn"
+            [disabled]="payingId() === po.id || +payInputAmount() < 0 || payInputAmount().trim() === ''"
+            (click)="confirmPayFromDialog()"
+          >
+            {{ payingId() === po.id ? 'Paying…' : 'Confirm pay' }}
+          </button>
+          <button type="button" class="dialog-cancel-btn" (click)="closePayDialog()">Close</button>
+        </div>
+      </div>
+    </div>
+  }
+
+</div>

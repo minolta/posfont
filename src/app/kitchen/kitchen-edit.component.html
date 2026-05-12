@@ -1,0 +1,65 @@
+<div class="page">
+  <a routerLink="/kitchens" class="back">← Back to kitchens</a>
+  <h1>Edit kitchen</h1>
+  <p class="hint">
+    Updates via <code>PUT /api/kitchens/&#123;id&#125;</code> with
+    <span class="mono">code</span>, <span class="mono">name</span>, and <span class="mono">version</span> (optimistic lock).
+  </p>
+
+  @if (loading()) {
+    <p class="status">Loading…</p>
+  } @else if (loadError(); as le) {
+    <p class="error-banner" role="alert">{{ le }}</p>
+  } @else {
+    @if (saveError(); as se) {
+      <p class="error-banner" role="alert">{{ se }}</p>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+      <div class="field" [class.invalid]="form.controls.code.invalid && form.controls.code.touched">
+        <label for="kitchen-edit-code">Code</label>
+        <input
+          id="kitchen-edit-code"
+          type="text"
+          formControlName="code"
+          autocomplete="off"
+          spellcheck="false"
+          maxlength="255"
+          [readonly]="submitting()"
+        />
+        @if (form.controls.code.invalid && form.controls.code.touched) {
+          <span class="err">Enter a valid code.</span>
+        }
+      </div>
+
+      <div class="field" [class.invalid]="form.controls.name.invalid && form.controls.name.touched">
+        <label for="kitchen-edit-name">Name</label>
+        <input
+          id="kitchen-edit-name"
+          type="text"
+          formControlName="name"
+          autocomplete="off"
+          maxlength="255"
+          [readonly]="submitting()"
+        />
+        @if (form.controls.name.invalid && form.controls.name.touched) {
+          <span class="err">Name is required.</span>
+        }
+      </div>
+
+      <div class="field" [class.invalid]="form.controls.version.invalid && form.controls.version.touched">
+        <label for="kitchen-edit-version">Version</label>
+        <input id="kitchen-edit-version" type="number" formControlName="version" min="0" step="1" [readonly]="submitting()" />
+        @if (form.controls.version.invalid && form.controls.version.touched) {
+          <span class="err">Version must be a non‑negative integer (from the server).</span>
+        }
+      </div>
+
+      <div class="actions">
+        <button type="submit" [disabled]="submitting() || form.invalid">
+          {{ submitting() ? 'Saving…' : 'Save changes' }}
+        </button>
+      </div>
+    </form>
+  }
+</div>

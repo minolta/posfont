@@ -1,0 +1,93 @@
+<div class="page">
+  <a routerLink="/zones" class="back">← Back to zones</a>
+  <h1>Edit zone</h1>
+  <p class="hint">
+    Updates via <code>PUT /api/zones/&#123;id&#125;</code>. A <strong>photo is required</strong> for every zone: add one below if this zone has no image yet, or replace via upload before saving when needed.
+    Include <span class="mono">version</span> for optimistic locking.
+  </p>
+
+  @if (loading()) {
+    <p class="status">Loading…</p>
+  } @else if (loadError(); as le) {
+    <p class="error-banner" role="alert">{{ le }}</p>
+  } @else {
+    @if (saveError(); as se) {
+      <p class="error-banner" role="alert">{{ se }}</p>
+    }
+
+    @if (photoRequiredHint() && !hasZonePhoto()) {
+      <p class="error-banner" role="alert">This zone must have a photo. Choose a file and upload, or pick a file to include on Save.</p>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+      <div class="field" [class.invalid]="form.controls.code.invalid && form.controls.code.touched">
+        <label for="zone-edit-code">Code</label>
+        <input
+          id="zone-edit-code"
+          type="text"
+          formControlName="code"
+          autocomplete="off"
+          spellcheck="false"
+          maxlength="255"
+          [readonly]="submitting()"
+        />
+        @if (form.controls.code.invalid && form.controls.code.touched) {
+          <span class="err">Enter a valid code.</span>
+        }
+      </div>
+
+      <div class="field" [class.invalid]="form.controls.name.invalid && form.controls.name.touched">
+        <label for="zone-edit-name">Name</label>
+        <input
+          id="zone-edit-name"
+          type="text"
+          formControlName="name"
+          autocomplete="off"
+          maxlength="255"
+          [readonly]="submitting()"
+        />
+        @if (form.controls.name.invalid && form.controls.name.touched) {
+          <span class="err">Name is required.</span>
+        }
+      </div>
+
+      <div class="field">
+        <label>Photo <span class="req">(required)</span></label>
+        @if (currentPictureSrc(); as ps) {
+          <div class="picture-row">
+            <img [src]="ps" alt="" class="zone-photo-preview" width="120" height="120" />
+          </div>
+        } @else {
+          <p class="hint-inline">No image yet — choose a file and upload, or attach one and use Save.</p>
+        }
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/gif,image/webp"
+          (change)="onPictureFileChange($event)"
+        />
+        @if (pictureUploadError(); as pue) {
+          <p class="err" role="alert">{{ pue }}</p>
+        }
+        <div class="picture-actions">
+          <button type="button" [disabled]="pictureUploading() || pictureFile() == null" (click)="uploadPicture()">
+            {{ pictureUploading() ? 'Uploading…' : 'Upload / replace image' }}
+          </button>
+        </div>
+      </div>
+
+      <div class="field" [class.invalid]="form.controls.version.invalid && form.controls.version.touched">
+        <label for="zone-edit-version">Version</label>
+        <input id="zone-edit-version" type="number" formControlName="version" min="0" step="1" [readonly]="submitting()" />
+        @if (form.controls.version.invalid && form.controls.version.touched) {
+          <span class="err">Version must be a non‑negative integer from the server.</span>
+        }
+      </div>
+
+      <div class="actions">
+        <button type="submit" [disabled]="submitting() || !canSubmitForm()">
+          {{ submitting() ? 'Saving…' : 'Save changes' }}
+        </button>
+      </div>
+    </form>
+  }
+</div>

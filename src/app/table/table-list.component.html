@@ -1,0 +1,158 @@
+<div class="table-list-page">
+  <h1>Tables</h1>
+  <p class="hint">
+    Search matches <span class="mono">code</span> on the server (<code>GET /api/tables?q=</code>). Each table belongs to a
+    <span class="mono">zone</span>.
+  </p>
+
+  @if (createdId(); as cid) {
+    <p class="success-banner">
+      Table <span class="mono">#{{ cid }}</span> was created.
+      <a routerLink="/tables">Dismiss</a>
+    </p>
+  }
+  @if (updatedId(); as uid) {
+    <p class="success-banner success-banner--muted">
+      Table <span class="mono">#{{ uid }}</span> was updated.
+      <a routerLink="/tables">Dismiss</a>
+    </p>
+  }
+
+  <div class="toolbar">
+    <div class="search-field">
+      <label class="label-text" for="table-search">Search</label>
+      <input
+        id="table-search"
+        type="search"
+        autocomplete="off"
+        placeholder="Code contains…"
+        [value]="searchTerm()"
+        (input)="onSearchInput($any($event.target).value)"
+      />
+    </div>
+    @if (loading()) {
+      <span class="status" aria-live="polite">Loading…</span>
+    }
+    <a routerLink="/tables/new" class="add-link">Add table</a>
+  </div>
+
+  @if (error(); as err) {
+    <p class="error" role="alert">{{ err }}</p>
+  }
+  @if (deleteError(); as delErr) {
+    <p class="error" role="alert">{{ delErr }}</p>
+  }
+  @if (payError(); as payErr) {
+    <p class="error" role="alert">{{ payErr }}</p>
+  }
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Code</th>
+          <th>Zone</th>
+          <th>Ver.</th>
+          <th class="col-actions">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        @if (loading() && tables().length === 0) {
+          <tr>
+            <td class="empty" colspan="5">Loading…</td>
+          </tr>
+        }
+        @for (t of tables(); track t.id ?? $index) {
+          <tr>
+            <td class="mono">{{ t.id }}</td>
+            <td class="mono">{{ t.code }}</td>
+            <td>{{ zoneCell(t.zone) }}</td>
+            <td class="mono">{{ t.version }}</td>
+            <td class="col-actions">
+              @if (t.id != null) {
+                <button
+                  type="button"
+                  class="new-order-link"
+                  [class.pay-link]="hasBlockedOpenOrder(t.id)"
+                  [attr.title]="hasBlockedOpenOrder(t.id) ? 'Pay open order on this table' : 'Create new order'"
+                  (click)="openNewOrder(t)"
+                >
+                  @if (hasBlockedOpenOrder(t.id)) {
+                    Pay ({{ payableTotalByTable(t.id) | number: '1.0-2' }})
+                  } @else {
+                    New order
+                  }
+                </button>
+                @if (hasBlockedOpenOrder(t.id) && t.id != null) {
+                  <button
+                    type="button"
+                    class="new-order-link add-line-link"
+                    title="Add more order lines"
+                    (click)="openAddLineForTable(t.id)"
+                  >
+                    + Line
+                  </button>
+                }
+                <a [routerLink]="['/tables', t.id, 'edit']" class="edit-link">Edit</a>
+                <button
+                  type="button"
+                  class="delete-btn"
+                  [disabled]="deletingId() === t.id"
+                  (click)="deleteTable(t)"
+                >
+                  {{ deletingId() === t.id ? 'Deleting…' : 'Delete' }}
+                </button>
+              }
+            </td>
+          </tr>
+        } @empty {
+          @if (!loading()) {
+            <tr>
+              <td class="empty" colspan="5">No tables found.</td>
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+  </div>
+
+  @if (payDialogOrder(); as po) {
+    <div class="dialog-backdrop" (click)="closePayDialog()">
+      <div class="pay-dialog" (click)="$event.stopPropagation()">
+        <h3>Confirm payment</h3>
+        <p class="pay-order-no">
+          Order: <span class="mono">{{ po.orderNo }}</span>
+        </p>
+        <p class="pay-total">
+          Total to pay (ignore canceled lines):
+          <span class="mono">{{ payableTotal(po) | number: '1.2-2' }}</span>
+        </p>
+        <label class="pay-input-label" for="table-pay-input-amount">Input total to pay</label>
+        <input
+          id="table-pay-input-amount"
+          type="number"
+          min="0"
+          step="0.01"
+          class="pay-input"
+          [value]="payInputAmount()"
+          [readonly]="payingOrderId() === po.id"
+          (focus)="$any($event.target).select()"
+          (click)="$any($event.target).select()"
+          (input)="setPayInputAmount($any($event.target).value)"
+        />
+        <div class="pay-actions">
+          <button
+            type="button"
+            class="new-order-link pay-link"
+            [disabled]="payingOrderId() === po.id || +payInputAmount() < 0 || payInputAmount().trim() === ''"
+            (click)="confirmPayFromDialog()"
+          >
+            {{ payingOrderId() === po.id ? 'Paying…' : 'Confirm pay' }}
+          </button>
+          <button type="button" class="edit-link pay-close-btn" (click)="closePayDialog()">Close</button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

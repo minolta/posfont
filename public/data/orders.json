@@ -1,0 +1,26 @@
+[
+  {
+    "id": 1,
+    "orderNo": "ORD-2026-0001",
+    "table": {
+      "id": 1,
+      "code": "T-01",
+      "basePrice": 0,
+      "version": 0,
+      "zone": { "id": 1, "code": "DINING-A", "name": "Dining A", "version": 0 }
+    },
+    "food": {
+      "id": 1,
+      "code": "BRG-CLSC",
+      "basePrice": 8.99,
+      "kitchen": { "id": 1, "code": "MAIN", "version": 0 },
+      "foodCategory": { "id": 1, "code": "MAINS", "version": 0 },
+      "version": 0
+    },
+    "orderDate": "2026-05-12T10:30:00",
+    "complateOrder": false,
+    "complateOrderDate": null,
+    "cancel": false,
+    "version": 0
+  }
+]
