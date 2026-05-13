@@ -15,10 +15,10 @@ import {
 
 import type { Zone } from '../zone/zone.model';
 import {
-  orderHasWaitingLines,
   orderRequestCompleteAllExceptCanceled,
   resolvedLineStatus,
 } from '../order/order-line-status.util';
+import { buildPayOrderRequest, mergePayOrderAmounts } from '../order/order-pay.util';
 import type { OrderLine, PosOrder } from '../order/order.model';
 import { OrderService } from '../order/order.service';
 import type { PosTable } from './table.model';
@@ -174,8 +174,9 @@ export class TableListComponent {
       return;
     }
     const amount = Number(this.payInputAmount());
-    if (!Number.isFinite(amount) || amount < 0) {
-      this.payError.set('Please enter a valid amount to pay.');
+    const payBody = buildPayOrderRequest(amount, this.payableTotal(order));
+    if ('error' in payBody) {
+      this.payError.set(payBody.error);
       return;
     }
     if (order.table?.id == null) {
@@ -183,19 +184,17 @@ export class TableListComponent {
       return;
     }
     const id = order.id;
-    const completeBody = orderRequestCompleteAllExceptCanceled(order);
-    if (orderHasWaitingLines(order) && completeBody == null) {
-      this.payError.set('Could not build line update for payment.');
+    const baseBody = orderRequestCompleteAllExceptCanceled(order);
+    if (baseBody == null) {
+      this.payError.set('Order has no table reference and cannot be updated.');
       return;
     }
+    const prepBody = mergePayOrderAmounts(baseBody, payBody);
     this.payingOrderId.set(id);
     this.payError.set(null);
-    const pay$ =
-      orderHasWaitingLines(order) && completeBody != null
-        ? this.orderService
-            .updateOrder(id, completeBody)
-            .pipe(switchMap(() => this.orderService.payOrder(id)))
-        : this.orderService.payOrder(id);
+    const pay$ = this.orderService
+      .updateOrder(id, prepBody)
+      .pipe(switchMap(() => this.orderService.payOrder(id, payBody)));
     pay$
       .pipe(finalize(() => this.payingOrderId.set(null)))
       .subscribe({
@@ -223,6 +222,20 @@ export class TableListComponent {
       }
       return sum + line.quantity * line.unitPrice;
     }, 0);
+  }
+
+  /** Cash change when the entered amount is greater than the payable total (cent-safe). */
+  payDialogChange(order: PosOrder): number {
+    const tendered = Number(this.payInputAmount());
+    const due = this.payableTotal(order);
+    if (!Number.isFinite(tendered) || !Number.isFinite(due)) {
+      return 0;
+    }
+    const cents = Math.round(tendered * 100) - Math.round(due * 100);
+    if (cents <= 0) {
+      return 0;
+    }
+    return cents / 100;
   }
 
   lineStatus(line: OrderLine, order: PosOrder): 'WAIT' | 'COMPLETE' | 'CANCEL' {

@@ -22,6 +22,7 @@ import {
   orderRequestCompleteAllExceptCanceled,
   resolvedLineStatus,
 } from './order-line-status.util';
+import { buildPayOrderRequest, mergeOrderRequestPaymentFromPosOrder, mergePayOrderAmounts, readPosOrderPaidPrice } from './order-pay.util';
 import type { OrderLine, OrderRequest, PosOrder } from './order.model';
 import { OrderService } from './order.service';
 
@@ -214,8 +215,9 @@ export class OrderListComponent {
       return;
     }
     const amount = Number(this.payInputAmount());
-    if (!Number.isFinite(amount) || amount < 0) {
-      this.payError.set('Please enter a valid amount to pay.');
+    const payBody = buildPayOrderRequest(amount, this.payableTotal(order));
+    if ('error' in payBody) {
+      this.payError.set(payBody.error);
       return;
     }
     if (order.table?.id == null) {
@@ -223,19 +225,17 @@ export class OrderListComponent {
       return;
     }
     const id = order.id;
-    const completeBody = orderRequestCompleteAllExceptCanceled(order);
-    if (orderHasWaitingLines(order) && completeBody == null) {
-      this.payError.set('Could not build line update for payment.');
+    const baseBody = orderRequestCompleteAllExceptCanceled(order);
+    if (baseBody == null) {
+      this.payError.set('Order has no table reference and cannot be updated.');
       return;
     }
+    const prepBody = mergePayOrderAmounts(baseBody, payBody);
     this.payingId.set(id);
     this.payError.set(null);
-    const pay$ =
-      orderHasWaitingLines(order) && completeBody != null
-        ? this.orderService
-            .updateOrder(id, completeBody)
-            .pipe(switchMap(() => this.orderService.payOrder(id)))
-        : this.orderService.payOrder(id);
+    const pay$ = this.orderService
+      .updateOrder(id, prepBody)
+      .pipe(switchMap(() => this.orderService.payOrder(id, payBody)));
     pay$
       .pipe(finalize(() => this.payingId.set(null)))
       .subscribe({
@@ -399,21 +399,24 @@ export class OrderListComponent {
     }
     this.statusError.set(null);
     const now = new Date().toISOString().slice(0, 19);
-    const body: OrderRequest = {
-      orderNo: o.orderNo,
-      tableId,
-      orderDate: o.orderDate ?? now,
-      complateOrder: target === 'COMPLETE',
-      complateOrderDate: target === 'COMPLETE' ? now : null,
-      cancel: target === 'CANCEL',
-      version: o.version,
-      lines: (o.lines ?? []).map((ln, idx) => ({
-        foodId: ln.food?.id ?? 0,
-        quantity: ln.quantity,
-        status: idx === lineIndex ? target : this.lineStatus(ln, o),
-      }))
-        .filter((ln) => ln.foodId > 0),
-    };
+    const body = mergeOrderRequestPaymentFromPosOrder(
+      {
+        orderNo: o.orderNo,
+        tableId,
+        orderDate: o.orderDate ?? now,
+        complateOrder: target === 'COMPLETE',
+        complateOrderDate: target === 'COMPLETE' ? now : null,
+        cancel: target === 'CANCEL',
+        version: o.version,
+        lines: (o.lines ?? []).map((ln, idx) => ({
+          foodId: ln.food?.id ?? 0,
+          quantity: ln.quantity,
+          status: idx === lineIndex ? target : this.lineStatus(ln, o),
+        }))
+          .filter((ln) => ln.foodId > 0),
+      },
+      o,
+    );
     const lineKey = this.lineUpdateKey(o.id, lineIndex);
     this.statusUpdatingKey.set(lineKey);
     this.orderService
@@ -467,6 +470,25 @@ export class OrderListComponent {
     }, 0);
   }
 
+  /** Stored cash tendered (`paidPrice`); shown for reporting when the API returns it. */
+  amountReceived(o: PosOrder): number | null {
+    return readPosOrderPaidPrice(o);
+  }
+
+  /** Cash change when the entered amount is greater than the payable total (cent-safe). */
+  payDialogChange(order: PosOrder): number {
+    const tendered = Number(this.payInputAmount());
+    const due = this.payableTotal(order);
+    if (!Number.isFinite(tendered) || !Number.isFinite(due)) {
+      return 0;
+    }
+    const cents = Math.round(tendered * 100) - Math.round(due * 100);
+    if (cents <= 0) {
+      return 0;
+    }
+    return cents / 100;
+  }
+
   toggleOrderLines(orderId: number | null | undefined): void {
     if (orderId == null) {
       return;
@@ -514,23 +536,26 @@ export class OrderListComponent {
       this.addLineError.set('Order has no table reference and cannot be updated.');
       return;
     }
-    const body: OrderRequest = {
-      orderNo: o.orderNo,
-      tableId,
-      orderDate: o.orderDate ?? new Date().toISOString().slice(0, 19),
-      complateOrder: o.complateOrder,
-      complateOrderDate: o.complateOrderDate,
-      cancel: o.cancel,
-      version: o.version,
-      lines: [
-        ...(o.lines ?? []).map((ln) => ({
-          foodId: ln.food?.id ?? 0,
-          quantity: ln.quantity,
-          status: this.lineStatus(ln, o),
-        })),
-        { foodId, quantity: qty, status: 'WAIT' as const },
-      ].filter((ln) => ln.foodId > 0),
-    };
+    const body = mergeOrderRequestPaymentFromPosOrder(
+      {
+        orderNo: o.orderNo,
+        tableId,
+        orderDate: o.orderDate ?? new Date().toISOString().slice(0, 19),
+        complateOrder: o.complateOrder,
+        complateOrderDate: o.complateOrderDate,
+        cancel: o.cancel,
+        version: o.version,
+        lines: [
+          ...(o.lines ?? []).map((ln) => ({
+            foodId: ln.food?.id ?? 0,
+            quantity: ln.quantity,
+            status: this.lineStatus(ln, o),
+          })),
+          { foodId, quantity: qty, status: 'WAIT' as const },
+        ].filter((ln) => ln.foodId > 0),
+      },
+      o,
+    );
     this.addingLineId.set(orderId);
     this.orderService
       .updateOrder(orderId, body)
@@ -563,27 +588,30 @@ export class OrderListComponent {
       const curr = merged.get(item.foodId) ?? 0;
       merged.set(item.foodId, curr + Math.max(1, Math.floor(item.qty)));
     }
-    const body: OrderRequest = {
-      orderNo: o.orderNo,
-      tableId,
-      orderDate: o.orderDate ?? new Date().toISOString().slice(0, 19),
-      complateOrder: o.complateOrder,
-      complateOrderDate: o.complateOrderDate,
-      cancel: o.cancel,
-      version: o.version,
-      lines: [
-        ...(o.lines ?? []).map((ln) => ({
-          foodId: ln.food?.id ?? 0,
-          quantity: ln.quantity,
-          status: this.lineStatus(ln, o),
-        })),
-        ...[...merged.entries()].map(([foodId, quantity]) => ({
-          foodId,
-          quantity,
-          status: 'WAIT' as const,
-        })),
-      ].filter((ln) => ln.foodId > 0),
-    };
+    const body = mergeOrderRequestPaymentFromPosOrder(
+      {
+        orderNo: o.orderNo,
+        tableId,
+        orderDate: o.orderDate ?? new Date().toISOString().slice(0, 19),
+        complateOrder: o.complateOrder,
+        complateOrderDate: o.complateOrderDate,
+        cancel: o.cancel,
+        version: o.version,
+        lines: [
+          ...(o.lines ?? []).map((ln) => ({
+            foodId: ln.food?.id ?? 0,
+            quantity: ln.quantity,
+            status: this.lineStatus(ln, o),
+          })),
+          ...[...merged.entries()].map(([foodId, quantity]) => ({
+            foodId,
+            quantity,
+            status: 'WAIT' as const,
+          })),
+        ].filter((ln) => ln.foodId > 0),
+      },
+      o,
+    );
     this.addingLineId.set(orderId);
     this.orderService
       .updateOrder(orderId, body)

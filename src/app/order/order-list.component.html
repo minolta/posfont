@@ -1,8 +1,8 @@
 <div class="order-list-page">
   <h1>Orders</h1>
   <p class="hint">
-    Search matches <span class="mono">orderNo</span> on the server (<code>GET /api/orders?q=</code>). Orders have
-    <strong>lines</strong> (food + quantity); use <strong>Pay</strong> to settle (<code>POST …/pay</code>).
+    Search matches <span class="mono">orderNo</span> on the server (<code>GET /api/orders?q=</code>). Paid orders should return
+    <span class="mono">paidPrice</span> (cash received) for reporting—the API must save it on <span class="mono">PosOrder</span> when you pay.
   </p>
 
   @if (createdId(); as cid) {
@@ -64,6 +64,7 @@
           <th>Done</th>
           <th>Cancel</th>
           <th>Paid</th>
+          <th title="Cash tendered (paidPrice)—for reporting">Rec’d</th>
           <th>Total/Pay</th>
           <th>Ver.</th>
           <th class="col-actions">Actions</th>
@@ -72,7 +73,7 @@
       <tbody>
         @if (loading() && orders().length === 0) {
           <tr>
-            <td class="empty" colspan="11">Loading…</td>
+            <td class="empty" colspan="12">Loading…</td>
           </tr>
         }
         @for (o of orders(); track o.id ?? $index) {
@@ -99,7 +100,14 @@
             <td>{{ o.complateOrder ? 'Yes' : 'No' }}</td>
             <td>{{ o.cancel ? 'Yes' : 'No' }}</td>
             <td>{{ o.paid ? 'Yes' : 'No' }}</td>
-            <td class="mono" [attr.title]="'Total/Get pay (exclude canceled lines)'">
+            <td class="mono" title="paidPrice from API (cash received)">
+              @if (amountReceived(o); as rec) {
+                {{ rec | number: '1.2-2' }}
+              } @else {
+                —
+              }
+            </td>
+            <td class="mono" [attr.title]="'Line total / payable (exclude canceled)'">
               {{ orderTotal(o) | number: '1.0-2' }}/<span class="payable-value">{{
                 payableTotal(o) | number: '1.0-2'
               }}</span>
@@ -138,7 +146,7 @@
           </tr>
           @if (expandedOrderId() === o.id) {
             <tr class="line-details-row">
-              <td colspan="11">
+              <td colspan="12">
                 <div class="line-details">
                   <div class="line-details-header">
                     <div class="line-details-title">Order lines</div>
@@ -230,7 +238,7 @@
         } @empty {
           @if (!loading()) {
             <tr>
-              <td class="empty" colspan="11">No orders found.</td>
+              <td class="empty" colspan="12">No orders found.</td>
             </tr>
           }
         }
@@ -262,6 +270,12 @@
           (click)="$any($event.target).select()"
           (input)="setPayInputAmount($any($event.target).value)"
         />
+        @let change = payDialogChange(po);
+        @if (change > 0) {
+          <p class="pay-change">
+            Change: <span class="mono">{{ change | number: '1.2-2' }}</span>
+          </p>
+        }
         <div class="dialog-actions">
           <button
             type="button"

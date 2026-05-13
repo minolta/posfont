@@ -141,6 +141,12 @@
           (click)="$any($event.target).select()"
           (input)="setPayInputAmount($any($event.target).value)"
         />
+        @let change = payDialogChange(po);
+        @if (change > 0) {
+          <p class="pay-change">
+            Change: <span class="mono">{{ change | number: '1.2-2' }}</span>
+          </p>
+        }
         <div class="pay-actions">
           <button
             type="button"

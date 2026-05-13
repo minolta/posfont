@@ -1,4 +1,5 @@
 import type { OrderLine, OrderRequest, PosOrder } from './order.model';
+import { mergeOrderRequestPaymentFromPosOrder } from './order-pay.util';
 
 /** Normalizes API line status (e.g. uppercase) and order-level flags. */
 export function resolvedLineStatus(
@@ -35,24 +36,27 @@ export function orderRequestCompleteAllExceptCanceled(order: PosOrder): OrderReq
     return null;
   }
   const now = new Date().toISOString().slice(0, 19);
-  return {
-    orderNo: order.orderNo,
-    tableId,
-    orderDate: order.orderDate ?? now,
-    complateOrder: order.complateOrder,
-    complateOrderDate: order.complateOrderDate,
-    cancel: order.cancel,
-    version: order.version,
-    lines: (order.lines ?? [])
-      .map((ln) => {
-        const status: 'CANCEL' | 'COMPLETE' =
-          resolvedLineStatus(ln, order) === 'CANCEL' ? 'CANCEL' : 'COMPLETE';
-        return {
-          foodId: ln.food?.id ?? 0,
-          quantity: ln.quantity,
-          status,
-        };
-      })
-      .filter((ln) => ln.foodId > 0),
-  };
+  return mergeOrderRequestPaymentFromPosOrder(
+    {
+      orderNo: order.orderNo,
+      tableId,
+      orderDate: order.orderDate ?? now,
+      complateOrder: order.complateOrder,
+      complateOrderDate: order.complateOrderDate,
+      cancel: order.cancel,
+      version: order.version,
+      lines: (order.lines ?? [])
+        .map((ln) => {
+          const status: 'CANCEL' | 'COMPLETE' =
+            resolvedLineStatus(ln, order) === 'CANCEL' ? 'CANCEL' : 'COMPLETE';
+          return {
+            foodId: ln.food?.id ?? 0,
+            quantity: ln.quantity,
+            status,
+          };
+        })
+        .filter((ln) => ln.foodId > 0),
+    },
+    order,
+  );
 }

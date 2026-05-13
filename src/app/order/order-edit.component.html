@@ -26,6 +26,24 @@
         <dd>{{ formatDateShort(vo.paidAt) }}</dd>
         <dt>Total pay</dt>
         <dd class="mono">{{ totalPay(vo) | number: '1.2-2' }}</dd>
+        <dt>Amount received</dt>
+        <dd class="mono">
+          @let at = paidAmountTendered(vo);
+          @if (at !== null) {
+            {{ at | number: '1.2-2' }}
+          } @else {
+            —
+          }
+        </dd>
+        <dt>Change</dt>
+        <dd class="mono">
+          @let ch = paidChangeAmount(vo);
+          @if (ch !== null) {
+            {{ ch | number: '1.2-2' }}
+          } @else {
+            —
+          }
+        </dd>
         <dt>Version</dt>
         <dd class="mono">{{ vo.version }}</dd>
       </dl>

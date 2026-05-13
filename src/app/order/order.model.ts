@@ -25,8 +25,18 @@ export interface PosOrder {
   cancel: boolean;
   paid: boolean;
   paidAt: string | null;
+  /** Cash amount the customer paid (tendered); persisted on pay (`paidPrice` / `paid_price` on API). */
+  paidPrice?: number | null;
+  /** Change returned to the customer; persisted on pay. */
+  change?: number | null;
   lines: OrderLine[];
   version: number;
+}
+
+/** JSON body for `POST /api/orders/{id}/pay` — maps to PosOrder `paidPrice` and `change`. */
+export interface PayOrderRequest {
+  paidPrice: number;
+  change: number;
 }
 
 /** Matches `me.pixka.pos.order.api.OrderLineRequest`. */
@@ -47,4 +57,7 @@ export interface OrderRequest {
   cancel: boolean;
   lines: OrderLineRequest[];
   version: number;
+  /** Present after payment; include on PUT so the server does not clear persisted values. */
+  paidPrice?: number | null;
+  change?: number | null;
 }

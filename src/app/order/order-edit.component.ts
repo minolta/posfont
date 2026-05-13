@@ -23,6 +23,7 @@ import {
 } from './order-datetime.util';
 import { mergeFoodsFromApis, mergeTablesFromApis, foodPickerLabel, tablePickerLabel } from './order-merge.util';
 import type { OrderLine, OrderRequest, PosOrder } from './order.model';
+import { mergeOrderRequestPaymentFromPosOrder, readPosOrderChange, readPosOrderPaidPrice } from './order-pay.util';
 import { OrderService } from './order.service';
 
 @Component({
@@ -49,6 +50,8 @@ export class OrderEditComponent {
   readonly orderId = signal<number | null>(null);
   readonly orderPaid = signal(false);
   readonly paidView = signal<PosOrder | null>(null);
+  /** Snapshot from GET; used to re-send `paidPrice` / `change` on PUT when present. */
+  private readonly loadedOrder = signal<PosOrder | null>(null);
   readonly tableSearch = signal('');
   readonly foodSearch = signal('');
 
@@ -104,6 +107,7 @@ export class OrderEditComponent {
             this.orderId.set(null);
             this.orderPaid.set(false);
             this.paidView.set(null);
+            this.loadedOrder.set(null);
             return EMPTY;
           }
           this.orderId.set(id);
@@ -141,9 +145,11 @@ export class OrderEditComponent {
           }
           this.orderPaid.set(false);
           this.paidView.set(null);
+          this.loadedOrder.set(null);
           return;
         }
         this.loadError.set(null);
+        this.loadedOrder.set(order);
         if (order.paid) {
           this.orderPaid.set(true);
           this.paidView.set(order);
@@ -230,6 +236,27 @@ export class OrderEditComponent {
       }
       return sum + ln.quantity * ln.unitPrice;
     }, 0);
+  }
+
+  paidAmountTendered(o: PosOrder): number | null {
+    return readPosOrderPaidPrice(o);
+  }
+
+  /** Stored change from API, or paid price minus line total when paid price is known. */
+  paidChangeAmount(o: PosOrder): number | null {
+    const stored = readPosOrderChange(o);
+    if (stored !== null) {
+      return stored;
+    }
+    const t = this.paidAmountTendered(o);
+    if (t === null) {
+      return null;
+    }
+    const cents = Math.round(t * 100) - Math.round(this.totalPay(o) * 100);
+    if (cents < 0) {
+      return null;
+    }
+    return cents / 100;
   }
 
   formatDateShort(value: string | null | undefined): string {
@@ -329,17 +356,21 @@ export class OrderEditComponent {
           : Number((g.get('manualFoodId')?.value ?? '').toString().trim()),
       quantity: Math.max(1, Math.floor(Number(g.get('quantity')?.value))),
     }));
-    const body: OrderRequest = {
-      orderNo: (v.orderNo ?? '').trim(),
-      tableId,
-      orderDate: normalizeLocalDateTimeForApi((v.orderDate ?? '').toString()),
-      complateOrder: !!v.complateOrder,
-      complateOrderDate:
-        complateRaw.length > 0 ? normalizeLocalDateTimeForApi(complateRaw) : null,
-      cancel: !!v.cancel,
-      lines,
-      version: Number(v.version),
-    };
+    const loaded = this.loadedOrder();
+    const body = mergeOrderRequestPaymentFromPosOrder(
+      {
+        orderNo: (v.orderNo ?? '').trim(),
+        tableId,
+        orderDate: normalizeLocalDateTimeForApi((v.orderDate ?? '').toString()),
+        complateOrder: !!v.complateOrder,
+        complateOrderDate:
+          complateRaw.length > 0 ? normalizeLocalDateTimeForApi(complateRaw) : null,
+        cancel: !!v.cancel,
+        lines,
+        version: Number(v.version),
+      },
+      loaded,
+    );
     this.submitting.set(true);
     this.orderService
       .updateOrder(id, body)
