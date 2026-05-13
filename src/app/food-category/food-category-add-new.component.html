@@ -2,9 +2,7 @@
   <a routerLink="/food-categories" class="back">← Back to categories</a>
   <h1>New food category</h1>
   <p class="hint">
-    Creates a row via <code>POST /api/food-categories</code> with
-    <span class="mono">code</span>, optional <span class="mono">name</span>, and
-    <span class="mono">version</span> <code>0</code>.
+    Code required; optional name. Use <span class="mono">version</span> <code>0</code> for new rows.
   </p>
 
   @if (errorMessage(); as msg) {

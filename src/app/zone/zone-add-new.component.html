@@ -2,8 +2,7 @@
   <a routerLink="/zones" class="back">← Back to zones</a>
   <h1>Add zone</h1>
   <p class="hint">
-    Creates a zone via <code>POST /api/zones</code>, then uploads a required photo with
-    <code>POST /api/zones/&#123;id&#125;/picture</code> (JPEG, PNG, GIF, or WebP). If the upload fails, the new zone row is removed.
+    Saves the zone then uploads your photo (JPEG, PNG, GIF, or WebP). If the upload fails, the new row is discarded.
   </p>
 
   @if (errorMessage(); as msg) {

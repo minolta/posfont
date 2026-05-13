@@ -2,8 +2,7 @@
   <a routerLink="/kitchens" class="back">← Back to kitchens</a>
   <h1>Edit kitchen</h1>
   <p class="hint">
-    Updates via <code>PUT /api/kitchens/&#123;id&#125;</code> with
-    <span class="mono">code</span>, <span class="mono">name</span>, and <span class="mono">version</span> (optimistic lock).
+    Set kitchen code and name; include <span class="mono">version</span> for optimistic locking.
   </p>
 
   @if (loading()) {

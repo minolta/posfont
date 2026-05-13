@@ -2,8 +2,7 @@
   <a routerLink="/orders" class="back">← Back to orders</a>
   <h1>Edit order</h1>
   <p class="hint">
-    Updates via <code>PUT /api/orders/&#123;id&#125;</code> when the order is not paid. Keep <span class="mono">version</span> in sync
-    (optimistic lock). Paid orders are read-only here; use <strong>Pay</strong> from the list.
+    Only open orders can be edited. Keep <span class="mono">version</span> in sync. Paid orders are read-only—use <strong>Pay</strong> from the list.
   </p>
 
   @if (loading()) {

@@ -4,10 +4,7 @@
   <header class="backup-head">
     <h1>Backup</h1>
     <p class="hint">
-      <code>POST /api/backup/export</code> writes JSON under the server (<code>app.backup-dir</code>). Download uses
-      <code>GET /api/backup/download?fileName=…</code>.
-      <code>POST /api/backup/import?confirm=true</code> restores from the same JSON format (multipart <code>file</code>)
-      — <strong>it replaces all data</strong>.
+      Export saves a JSON snapshot on the server. Download a copy below. Import replaces all data from the chosen file.
     </p>
   </header>
 
@@ -33,7 +30,7 @@
         </div>
         @if (ex.message) {
           <div class="full">
-            <dt>Server</dt>
+            <dt>Note</dt>
             <dd>{{ ex.message }}</dd>
           </div>
         }

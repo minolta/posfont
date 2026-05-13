@@ -2,9 +2,7 @@
   <a routerLink="/kitchens" class="back">← Back to kitchens</a>
   <h1>Add kitchen</h1>
   <p class="hint">
-    Creates a row via <code>POST /api/kitchens</code> with
-    <span class="mono">code</span>, <span class="mono">name</span>, and <span class="mono">version</span>
-    (<code>0</code> for new rows).
+    Code and name required. Use <span class="mono">version</span> <code>0</code> for new rows.
   </p>
 
   @if (errorMessage(); as msg) {

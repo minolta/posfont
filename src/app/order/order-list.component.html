@@ -1,8 +1,7 @@
 <div class="order-list-page">
   <h1>Orders</h1>
   <p class="hint">
-    Search matches <span class="mono">orderNo</span> on the server (<code>GET /api/orders?q=</code>). Paid orders should return
-    <span class="mono">paidPrice</span> (cash received) for reporting—the API must save it on <span class="mono">PosOrder</span> when you pay.
+    Search by order number. Paid orders should show cash received when the server stores it for reporting.
   </p>
 
   @if (createdId(); as cid) {

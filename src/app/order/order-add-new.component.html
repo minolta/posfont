@@ -2,10 +2,8 @@
   <a routerLink="/orders" class="back">← Back to orders</a>
   <h1>New order</h1>
   <p class="hint">
-    Creates via <code>POST /api/orders</code>. The server assigns a unique <strong>order number</strong> automatically.
-    Choose the <strong>table</strong> by <strong>zone name</strong> (and table code); add lines and pick each <strong>food</strong> by <strong>name</strong>. Use
-    <span class="mono">version</span> <code>0</code> for new rows.
-    Optional <strong>Kitchen note</strong> per line tells prep staff about allergies, spice level, etc.
+    The server assigns a unique <strong>order number</strong>. Choose table by zone and table code; add lines and pick each food by name. Use
+    <span class="mono">version</span> <code>0</code> on new orders. Optional <strong>Kitchen note</strong> per line (allergies, spice, etc.).
   </p>
 
   @if (errorMessage(); as msg) {

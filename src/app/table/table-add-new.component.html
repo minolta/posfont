@@ -2,8 +2,7 @@
   <a routerLink="/tables" class="back">← Back to tables</a>
   <h1>Add table</h1>
   <p class="hint">
-    Creates a row via <code>POST /api/tables</code> with <span class="mono">code</span>, <span class="mono">basePrice</span>,
-    <span class="mono">zoneId</span>, and <span class="mono">version</span> (<code>0</code> for new rows).
+    Enter table code, base price, and zone; use <span class="mono">version</span> <code>0</code> for new rows.
   </p>
 
   @if (errorMessage(); as msg) {

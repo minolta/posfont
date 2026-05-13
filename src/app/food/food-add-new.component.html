@@ -2,10 +2,7 @@
   <a routerLink="/foods" class="back">← Back to foods</a>
   <h1>Add food</h1>
   <p class="hint">
-    Pick a kitchen by <span class="mono">name</span>, <span class="mono">code</span>, or <span class="mono">id</span>
-    from the list when it loads. If the list is empty, type the same into the lookup field; we resolve it with
-    <code>GET /api/kitchens?q=</code> when you save. Categories use <code>GET /api/food-categories</code> when available.
-    The API still receives <span class="mono">kitchenId</span> and <span class="mono">foodCategoryId</span>.
+    Pick kitchen by name, code, or id from the list. If the list is empty, type the same in the lookup field—we resolve it when you save. Categories load when available.
   </p>
 
   @if (errorMessage(); as msg) {
@@ -70,7 +67,7 @@
             autocomplete="off"
             placeholder="e.g. Main kitchen, KT-001, or 1"
           />
-          <p class="hint-inline">Matched on save using <code>GET /api/kitchens?q=</code> (exact code, full name, numeric id, or a single search hit).</p>
+          <p class="hint-inline">We resolve the kitchen when you save (code, full name, id, or one clear search hit).</p>
         </div>
       }
       @if (form.controls.kitchenId.invalid && form.controls.kitchenId.touched) {

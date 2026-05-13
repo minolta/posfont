@@ -2,8 +2,7 @@
   <a routerLink="/foods" class="back">← Back to foods</a>
   <h1>Edit food</h1>
   <p class="hint">
-    Updates via <code>PUT /api/foods/&#123;id&#125;</code>. Kitchen and category behave like on Add food; include the current
-    <span class="mono">version</span> from the server for optimistic locking.
+    Kitchen and category work like <strong>Add food</strong>. Include the server <span class="mono">version</span> for optimistic locking.
   </p>
 
   @if (loading()) {
@@ -73,7 +72,7 @@
               autocomplete="off"
               placeholder="e.g. Main kitchen, KT-001, or 1"
             />
-            <p class="hint-inline">Resolved on save with <code>GET /api/kitchens?q=</code>.</p>
+            <p class="hint-inline">We resolve the kitchen when you save.</p>
           </div>
         }
         @if (form.controls.kitchenId.invalid && form.controls.kitchenId.touched) {

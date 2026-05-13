@@ -2,9 +2,7 @@
   <a routerLink="/food-categories" class="back">← Back to categories</a>
   <h1>Edit food category</h1>
   <p class="hint">
-    Updates via <code>PUT /api/food-categories/&#123;id&#125;</code> with
-    <span class="mono">code</span>, optional <span class="mono">name</span>, and
-    <span class="mono">version</span> (optimistic lock).
+    Set code and optional name; include <span class="mono">version</span> for optimistic locking.
   </p>
 
   @if (loading()) {
