@@ -23,6 +23,7 @@ import {
   resolvedLineStatus,
 } from './order-line-status.util';
 import { buildPayOrderRequest, mergeOrderRequestPaymentFromPosOrder, mergePayOrderAmounts, readPosOrderPaidPrice } from './order-pay.util';
+import { lineKitchenNote, orderLineRequestNotePart } from './order-line-note.util';
 import type { OrderLine, OrderRequest, PosOrder } from './order.model';
 import { OrderService } from './order.service';
 
@@ -35,6 +36,9 @@ import { OrderService } from './order.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class OrderListComponent {
+  /** Template: show per-line kitchen note when present. */
+  readonly lineKitchenNote = lineKitchenNote;
+
   private static readonly PICKED_EXISTING_ORDER_LINES_KEY = 'order-list-add-picked-lines-v1';
   private readonly orderService = inject(OrderService);
   private readonly foodService = inject(FoodService);
@@ -412,6 +416,7 @@ export class OrderListComponent {
           foodId: ln.food?.id ?? 0,
           quantity: ln.quantity,
           status: idx === lineIndex ? target : this.lineStatus(ln, o),
+          ...orderLineRequestNotePart(ln),
         }))
           .filter((ln) => ln.foodId > 0),
       },
@@ -550,6 +555,7 @@ export class OrderListComponent {
             foodId: ln.food?.id ?? 0,
             quantity: ln.quantity,
             status: this.lineStatus(ln, o),
+            ...orderLineRequestNotePart(ln),
           })),
           { foodId, quantity: qty, status: 'WAIT' as const },
         ].filter((ln) => ln.foodId > 0),
@@ -602,6 +608,7 @@ export class OrderListComponent {
             foodId: ln.food?.id ?? 0,
             quantity: ln.quantity,
             status: this.lineStatus(ln, o),
+            ...orderLineRequestNotePart(ln),
           })),
           ...[...merged.entries()].map(([foodId, quantity]) => ({
             foodId,

@@ -97,4 +97,22 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./food/food-list.component').then((m) => m.FoodListComponent),
   },
+  { path: 'backup', redirectTo: 'reports/backup', pathMatch: 'full' },
+  {
+    path: 'reports',
+    loadComponent: () =>
+      import('./report/reports-layout.component').then((m) => m.ReportsLayoutComponent),
+    children: [
+      { path: '', pathMatch: 'full', redirectTo: 'daily' },
+      {
+        path: 'daily',
+        loadComponent: () =>
+          import('./report/daily-report.component').then((m) => m.DailyReportComponent),
+      },
+      {
+        path: 'backup',
+        loadComponent: () => import('./backup/backup.component').then((m) => m.BackupComponent),
+      },
+    ],
+  },
 ];

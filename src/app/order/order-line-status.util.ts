@@ -1,5 +1,6 @@
 import type { OrderLine, OrderRequest, PosOrder } from './order.model';
 import { mergeOrderRequestPaymentFromPosOrder } from './order-pay.util';
+import { orderLineRequestNotePart } from './order-line-note.util';
 
 /** Normalizes API line status (e.g. uppercase) and order-level flags. */
 export function resolvedLineStatus(
@@ -53,6 +54,7 @@ export function orderRequestCompleteAllExceptCanceled(order: PosOrder): OrderReq
             foodId: ln.food?.id ?? 0,
             quantity: ln.quantity,
             status,
+            ...orderLineRequestNotePart(ln),
           };
         })
         .filter((ln) => ln.foodId > 0),

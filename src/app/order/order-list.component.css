@@ -457,6 +457,14 @@ td.col-actions {
   border-bottom: 1px solid #edf2f7;
 }
 
+.line-note-cell {
+  max-width: 12rem;
+  color: #475569;
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .line-status {
   display: inline-block;
   min-width: 1.5rem;

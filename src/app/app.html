@@ -1,7 +1,7 @@
 <div class="app-shell">
   <header class="app-header">
     <span class="brand">{{ title() }}</span>
-    <nav>
+    <nav aria-label="Main">
       <a routerLink="/orders" routerLinkActive="active">Orders</a>
       <a routerLink="/orders/new" routerLinkActive="active">New order</a>
       <a routerLink="/foods" routerLinkActive="active">Foods</a>
@@ -14,6 +14,13 @@
       <a routerLink="/zones/new" routerLinkActive="active">Add zone</a>
       <a routerLink="/tables" routerLinkActive="active">Tables</a>
       <a routerLink="/tables/new" routerLinkActive="active">Add table</a>
+      <span class="nav-divider" aria-hidden="true"></span>
+      <a
+        routerLink="/reports"
+        routerLinkActive="active"
+        [routerLinkActiveOptions]="{ exact: false }"
+        >Reports</a
+      >
     </nav>
   </header>
   <main class="app-main">

@@ -17,6 +17,7 @@ import type { PosTable } from '../table/table.model';
 import { TableService } from '../table/table.service';
 import { defaultDatetimeLocal, normalizeLocalDateTimeForApi } from './order-datetime.util';
 import { mergeFoodsFromApis, mergeTablesFromApis, foodPickerLabel, tablePickerLabel } from './order-merge.util';
+import { trimNewLineNote } from './order-line-note.util';
 import type { OrderRequest } from './order.model';
 import { OrderService } from './order.service';
 
@@ -116,6 +117,7 @@ export class OrderAddNewComponent {
       foodId: [''],
       manualFoodId: [''],
       quantity: [1, [Validators.required, Validators.min(1)]],
+      note: ['', [Validators.maxLength(500)]],
     });
   }
 
@@ -222,13 +224,19 @@ export class OrderAddNewComponent {
     const tableId =
       ts.length > 0 ? Number(v.tableId) : Number((v.manualTableId ?? '').toString().trim());
     const complateRaw = (v.complateOrderDate ?? '').toString().trim();
-    const lines = (this.lines.controls as FormGroup[]).map((g) => ({
-      foodId:
+    const lines = (this.lines.controls as FormGroup[]).map((g) => {
+      const foodId =
         fs.length > 0
           ? Number(g.get('foodId')?.value)
-          : Number((g.get('manualFoodId')?.value ?? '').toString().trim()),
-      quantity: Math.max(1, Math.floor(Number(g.get('quantity')?.value))),
-    }));
+          : Number((g.get('manualFoodId')?.value ?? '').toString().trim());
+      const quantity = Math.max(1, Math.floor(Number(g.get('quantity')?.value)));
+      const note = trimNewLineNote(g.get('note')?.value);
+      return {
+        foodId,
+        quantity,
+        ...(note !== undefined ? { note } : {}),
+      };
+    });
     const body: OrderRequest = {
       tableId,
       orderDate: normalizeLocalDateTimeForApi((v.orderDate ?? '').toString()),
@@ -313,6 +321,7 @@ export class OrderAddNewComponent {
         foodId: String(v.foodId ?? ''),
         manualFoodId: String(v.manualFoodId ?? ''),
         quantity: Math.max(1, Math.floor(Number(v.quantity ?? 1))),
+        note: String(v.note ?? ''),
       };
     });
     const draft = {
@@ -361,7 +370,7 @@ export class OrderAddNewComponent {
         complateOrderDate?: string;
         cancel?: boolean;
         version?: number;
-        lines?: Array<{ foodId?: string; manualFoodId?: string; quantity?: number }>;
+        lines?: Array<{ foodId?: string; manualFoodId?: string; quantity?: number; note?: string }>;
       };
       this.form.patchValue({
         tableId: d.tableId ?? '',
@@ -385,6 +394,7 @@ export class OrderAddNewComponent {
               foodId: [String(ln.foodId ?? '')],
               manualFoodId: [String(ln.manualFoodId ?? '')],
               quantity: [Math.max(1, Math.floor(Number(ln.quantity ?? 1))), [Validators.required, Validators.min(1)]],
+              note: [String(ln.note ?? ''), [Validators.maxLength(500)]],
             }),
           );
         }

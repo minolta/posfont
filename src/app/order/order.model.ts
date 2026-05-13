@@ -8,6 +8,8 @@ export interface OrderLine {
   quantity: number;
   unitPrice: number;
   status: 'WAIT' | 'COMPLETE' | 'CANCEL';
+  /** Kitchen / prep instruction for this line (`note` or `kitchen_note` on some APIs). */
+  note?: string | null;
 }
 
 /**
@@ -39,11 +41,13 @@ export interface PayOrderRequest {
   change: number;
 }
 
-/** Matches `me.pixka.pos.order.api.OrderLineRequest`. */
+/** Matches `me.pixka.pos.order.api.OrderLineRequest`. Add the same on the Java DTO or Jackson will ignore / reject unknown keys. */
 export interface OrderLineRequest {
   foodId: number;
   quantity: number;
   status?: 'WAIT' | 'COMPLETE' | 'CANCEL';
+  /** Kitchen / prep text; sent as `note`, `kitchen_note`, `kitchenNote`, etc. in JSON (see `orderLineRequestToWire`). */
+  note?: string | null;
 }
 
 /** Matches `me.pixka.pos.order.api.OrderRequest`. */

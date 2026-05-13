@@ -157,13 +157,14 @@
                         <th>Food</th>
                         <th>Qty</th>
                         <th>Unit Price</th>
+                        <th>Kitchen note</th>
                         <th>Status</th>
                       </tr>
                     </thead>
                     <tbody>
                       @if (!o.paid && o.id != null && o.lines.length > 0) {
                         <tr class="line-list-actions-row">
-                          <td colspan="4" class="line-list-actions-cell">
+                          <td colspan="5" class="line-list-actions-cell">
                             <button
                               type="button"
                               class="complete-all-btn complete-all-btn--in-table"
@@ -187,6 +188,13 @@
                           <td>{{ foodLabel(ln.food) }}</td>
                           <td>{{ ln.quantity }}</td>
                           <td>{{ ln.unitPrice }}</td>
+                          <td class="line-note-cell">
+                            @if (lineKitchenNote(ln); as kn) {
+                              {{ kn }}
+                            } @else {
+                              —
+                            }
+                          </td>
                           <td>
                             <div class="line-status-wrap">
                             <span
@@ -226,7 +234,7 @@
                         </tr>
                       } @empty {
                         <tr>
-                          <td colspan="4" class="empty">No lines.</td>
+                          <td colspan="5" class="empty">No lines.</td>
                         </tr>
                       }
                     </tbody>

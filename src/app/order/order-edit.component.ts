@@ -23,6 +23,7 @@ import {
 } from './order-datetime.util';
 import { mergeFoodsFromApis, mergeTablesFromApis, foodPickerLabel, tablePickerLabel } from './order-merge.util';
 import type { OrderLine, OrderRequest, PosOrder } from './order.model';
+import { lineKitchenNote, trimNewLineNote } from './order-line-note.util';
 import { mergeOrderRequestPaymentFromPosOrder, readPosOrderChange, readPosOrderPaidPrice } from './order-pay.util';
 import { OrderService } from './order.service';
 
@@ -79,6 +80,7 @@ export class OrderEditComponent {
       foodId: [''],
       manualFoodId: [''],
       quantity: [1, [Validators.required, Validators.min(1)]],
+      note: ['', [Validators.maxLength(500)]],
     });
   }
 
@@ -167,6 +169,7 @@ export class OrderEditComponent {
               foodId: [fid != null ? String(fid) : ''],
               manualFoodId: [fid != null ? String(fid) : ''],
               quantity: [ln.quantity ?? 1, [Validators.required, Validators.min(1)]],
+              note: [lineKitchenNote(ln) ?? '', [Validators.maxLength(500)]],
             }),
           );
         }
@@ -211,7 +214,9 @@ export class OrderEditComponent {
     return lines
       .map((ln) => {
         const label = this.foodLabel(ln.food);
-        return `${ln.quantity}× ${label} @ ${ln.unitPrice}`;
+        const note = lineKitchenNote(ln);
+        const notePart = note ? ` — “${note}”` : '';
+        return `${ln.quantity}× ${label} @ ${ln.unitPrice}${notePart}`;
       })
       .join('; ');
   }
@@ -349,13 +354,19 @@ export class OrderEditComponent {
     const tableId =
       ts.length > 0 ? Number(v.tableId) : Number((v.manualTableId ?? '').toString().trim());
     const complateRaw = (v.complateOrderDate ?? '').toString().trim();
-    const lines = (this.lines.controls as FormGroup[]).map((g) => ({
-      foodId:
+    const lines = (this.lines.controls as FormGroup[]).map((g) => {
+      const foodId =
         fs.length > 0
           ? Number(g.get('foodId')?.value)
-          : Number((g.get('manualFoodId')?.value ?? '').toString().trim()),
-      quantity: Math.max(1, Math.floor(Number(g.get('quantity')?.value))),
-    }));
+          : Number((g.get('manualFoodId')?.value ?? '').toString().trim());
+      const quantity = Math.max(1, Math.floor(Number(g.get('quantity')?.value)));
+      const note = trimNewLineNote(g.get('note')?.value);
+      return {
+        foodId,
+        quantity,
+        ...(note !== undefined ? { note } : {}),
+      };
+    });
     const loaded = this.loadedOrder();
     const body = mergeOrderRequestPaymentFromPosOrder(
       {

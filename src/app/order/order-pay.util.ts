@@ -1,4 +1,4 @@
-import type { OrderRequest, PayOrderRequest, PosOrder } from './order.model';
+import type { OrderLineRequest, OrderRequest, PayOrderRequest, PosOrder } from './order.model';
 
 export type PayOrderRequestResult = PayOrderRequest | { error: string };
 
@@ -96,6 +96,29 @@ export function mergeOrderRequestPaymentFromPosOrder(
   return { ...body, ...paymentFieldsForOrderRequest(order) };
 }
 
+/** Single line in PUT/POST JSON — include several keys so Java can bind `note`, `kitchen_note`, or `kitchenNote`. */
+export function orderLineRequestToWire(line: OrderLineRequest): Record<string, unknown> {
+  const row: Record<string, unknown> = {
+    foodId: line.foodId,
+    quantity: line.quantity,
+  };
+  if (line.status != null) {
+    row['status'] = line.status;
+  }
+  const raw = line.note;
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (trimmed.length > 0) {
+      row['note'] = trimmed;
+      row['kitchen_note'] = trimmed;
+      row['kitchenNote'] = trimmed;
+      row['prep_note'] = trimmed;
+      row['prepNote'] = trimmed;
+    }
+  }
+  return row;
+}
+
 /** Plain object for PUT/POST JSON: avoids dropped `undefined` and adds snake_case names some Java APIs expect. */
 export function orderRequestToWireBody(body: OrderRequest): Record<string, unknown> {
   const out: Record<string, unknown> = {
@@ -104,21 +127,21 @@ export function orderRequestToWireBody(body: OrderRequest): Record<string, unkno
     complateOrder: body.complateOrder,
     complateOrderDate: body.complateOrderDate,
     cancel: body.cancel,
-    lines: body.lines,
+    lines: body.lines.map(orderLineRequestToWire),
     version: body.version,
   };
   if (body.orderNo !== undefined && body.orderNo !== '') {
-    out.orderNo = body.orderNo;
+    out['orderNo'] = body.orderNo;
   }
   const pp = finiteField(body.paidPrice);
   const ch = finiteField(body.change);
   if (pp !== null) {
-    out.paidPrice = pp;
-    out.paid_price = pp;
+    out['paidPrice'] = pp;
+    out['paid_price'] = pp;
   }
   if (ch !== null) {
-    out.change = ch;
-    out.change_amount = ch;
+    out['change'] = ch;
+    out['change_amount'] = ch;
   }
   return out;
 }

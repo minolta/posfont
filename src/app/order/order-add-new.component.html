@@ -5,6 +5,7 @@
     Creates via <code>POST /api/orders</code>. The server assigns a unique <strong>order number</strong> automatically.
     Choose the <strong>table</strong> by <strong>zone name</strong> (and table code); add lines and pick each <strong>food</strong> by <strong>name</strong>. Use
     <span class="mono">version</span> <code>0</code> for new rows.
+    Optional <strong>Kitchen note</strong> per line tells prep staff about allergies, spice level, etc.
   </p>
 
   @if (errorMessage(); as msg) {
@@ -93,6 +94,17 @@
                 step="1"
                 [readonly]="submitting()"
               />
+            </div>
+            <div class="field line-note-field">
+              <label [attr.for]="'line-note-' + i">Kitchen note</label>
+              <textarea
+                [id]="'line-note-' + i"
+                formControlName="note"
+                rows="2"
+                maxlength="500"
+                placeholder="e.g. no peanuts, extra spicy…"
+                [readonly]="submitting()"
+              ></textarea>
             </div>
             <button type="button" class="btn-remove-line" [disabled]="submitting() || lines.length <= 1" (click)="removeLine(i)">
               Remove

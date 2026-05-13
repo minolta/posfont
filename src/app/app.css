@@ -59,6 +59,14 @@
   background: rgba(255, 255, 255, 0.14);
 }
 
+.nav-divider {
+  align-self: stretch;
+  width: 1px;
+  margin: 0 0.15rem;
+  background: rgba(255, 255, 255, 0.22);
+  flex-shrink: 0;
+}
+
 .app-main {
   flex: 1;
   padding: 0;

@@ -112,7 +112,7 @@
 
       <fieldset class="lines-block">
         <legend>Line items</legend>
-        <p class="hint-inline lines-hint">At least one line. Replacing lines updates foods and quantities; unit price is set on save from each food’s current base price.</p>
+        <p class="hint-inline lines-hint">At least one line. Replacing lines updates foods and quantities; unit price is set on save from each food’s current base price. Use <strong>Kitchen note</strong> per line for prep instructions.</p>
         <div formArrayName="lines">
           @for (line of lines.controls; track $index; let i = $index) {
             <div [formGroupName]="i" class="line-row">
@@ -149,6 +149,17 @@
                   step="1"
                   [readonly]="submitting()"
                 />
+              </div>
+              <div class="field line-note-field">
+                <label [attr.for]="'order-edit-line-note-' + i">Kitchen note</label>
+                <textarea
+                  [id]="'order-edit-line-note-' + i"
+                  formControlName="note"
+                  rows="2"
+                  maxlength="500"
+                  placeholder="Optional — allergy, spice, timing…"
+                  [readonly]="submitting()"
+                ></textarea>
               </div>
               <button
                 type="button"

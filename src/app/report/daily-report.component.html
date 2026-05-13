@@ -1,0 +1,144 @@
+<div class="report-page">
+  <a routerLink="/orders" class="back">← Orders</a>
+  <header class="report-head">
+    <div>
+      <h1>Daily report</h1>
+      <p class="hint">
+        Primary: <code>GET /api/reports/daily</code> with <code>date=</code><span class="mono">yyyy-MM-dd</span> for a single day, or
+        <code>startDate=</code> and <code>endDate=</code> for a range. If that returns <strong>404</strong>, totals are estimated from
+        <code>GET /api/orders</code> for orders <strong>paid</strong> on a day in the selected range.
+      </p>
+    </div>
+    <div class="controls">
+      <label class="field">
+        <span class="label-text">Start date</span>
+        <input
+          type="date"
+          [value]="startDate()"
+          [disabled]="loading()"
+          (change)="onStartChange($any($event.target).value)"
+        />
+      </label>
+      <label class="field">
+        <span class="label-text">End date</span>
+        <input
+          type="date"
+          [value]="endDate()"
+          [disabled]="loading()"
+          (change)="onEndChange($any($event.target).value)"
+        />
+      </label>
+      <button type="button" class="btn-refresh" [disabled]="loading()" (click)="refresh()">
+        {{ loading() ? 'Loading…' : 'Refresh' }}
+      </button>
+    </div>
+  </header>
+
+  @if (error(); as er) {
+    <p class="error-banner" role="alert">{{ er }}</p>
+  }
+
+  @if (loading() && report() === null) {
+    <p class="status">Loading…</p>
+  }
+
+  @if (report(); as r) {
+    <p class="source-line">
+      @if (r.source === 'api') {
+        <span class="badge badge-api">Server report</span>
+      } @else {
+        <span class="badge badge-cli">Locally aggregated</span>
+        <span class="muted">endpoint not implemented (404).</span>
+      }
+      @if (isMultiDay(r)) {
+        <span class="range-pill mono">{{ r.startDate }} — {{ r.endDate }}</span>
+      }
+    </p>
+
+    <section class="summary" aria-label="Summary">
+      <div class="tile">
+        <span class="tile-label">@if (isMultiDay(r)) { Orders (range overlap) } @else { Orders (day overlap) }</span>
+        <span class="tile-val mono">{{ r.orderCount }}</span>
+      </div>
+      <div class="tile">
+        <span class="tile-label">@if (isMultiDay(r)) { Paid in range } @else { Paid this day }</span>
+        <span class="tile-val mono">{{ r.paidOrderCount }}</span>
+      </div>
+      <div class="tile">
+        <span class="tile-label">Sales due (lines)</span>
+        <span class="tile-val mono">{{ r.totalSales | number: '1.2-2' }}</span>
+      </div>
+      <div class="tile tile-cash">
+        <span class="tile-label">Cash received</span>
+        <span class="tile-val mono">{{ r.totalCashReceived | number: '1.2-2' }}</span>
+      </div>
+      <div class="tile">
+        <span class="tile-label">Change returned</span>
+        <span class="tile-val mono">{{ r.totalChange | number: '1.2-2' }}</span>
+      </div>
+    </section>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Order</th>
+            <th>Paid at</th>
+            <th>Due</th>
+            <th>Received</th>
+            <th>Change</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of r.rows; track row.orderId) {
+            <tr>
+              <td class="mono">
+                <a [routerLink]="['/orders', row.orderId, 'edit']" class="order-link">{{ row.orderNo }}</a>
+              </td>
+              <td>{{ row.paidAt | date: 'short' }}</td>
+              <td class="mono">{{ row.totalDue | number: '1.2-2' }}</td>
+              <td class="mono">{{ row.paidPrice != null ? (row.paidPrice | number: '1.2-2') : '—' }}</td>
+              <td class="mono">{{ row.change != null ? (row.change | number: '1.2-2') : '—' }}</td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="5" class="empty">No paid orders for this date range.</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <h2 class="section-title">By food</h2>
+    <p class="section-hint">
+      Quantities and line totals from <strong>paid</strong> orders in this range (non-cancelled lines). Rows sorted by <strong>total</strong>, then <strong>quantity</strong> (highest first).
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Code</th>
+            <th>Name</th>
+            <th>Qty</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (f of r.foods; track f.foodCode + ':' + f.foodName) {
+            <tr>
+              <td class="mono">{{ f.foodCode }}</td>
+              <td>{{ f.foodName }}</td>
+              <td class="mono">{{ f.quantity }}</td>
+              <td class="mono">{{ f.total | number: '1.2-2' }}</td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="4" class="empty">No line items for paid orders in this range.</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>
