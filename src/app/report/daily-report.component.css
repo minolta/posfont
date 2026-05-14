@@ -194,6 +194,15 @@ h1 {
   margin-bottom: 0.35rem;
 }
 
+.tile-sublabel {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: #737373;
+  margin: -0.15rem 0 0.4rem;
+  line-height: 1.2;
+}
+
 .tile-val {
   font-size: 1.2rem;
   font-weight: 600;

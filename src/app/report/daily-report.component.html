@@ -4,7 +4,9 @@
     <div>
       <h1>Daily report</h1>
       <p class="hint">
-        Choose dates and refresh. Figures are for orders <strong>paid</strong> in that range. Each row shows whether settlement was <strong>cash</strong> or <strong>QR scan</strong>. If the report service is unavailable, totals are estimated from your order list.
+        Choose dates and refresh. Figures are for orders <strong>paid</strong> in that range. Each row shows whether settlement was <strong>cash</strong> or <strong>QR scan</strong>.
+        <strong>Cash received</strong> and <strong>change returned</strong> count only <strong>cash</strong> settlements; QR totals are under <strong>Received via QR scan</strong>.
+        If the report service is unavailable, totals are estimated from your order list.
       </p>
     </div>
     <div class="controls">
@@ -67,15 +69,26 @@
         <span class="tile-val mono">{{ r.totalSales | number: '1.2-2' }}</span>
       </div>
       <div class="tile tile-cash">
+        <span class="tile-label">Real cash in shop</span>
+        <span class="tile-sublabel">sales due − received via QR scan</span>
+        <span class="tile-val mono">{{ r.realCashSalesDueInShop | number: '1.2-2' }}</span>
+      </div>
+      <div class="tile tile-cash">
         <span class="tile-label">Cash received</span>
+        <span class="tile-sublabel">cash only, excl. QR</span>
         <span class="tile-val mono">{{ r.totalCashReceived | number: '1.2-2' }}</span>
       </div>
       <div class="tile tile-qr">
-        <span class="tile-label">Paid by QR scan</span>
+        <span class="tile-label">Paid by QR (orders)</span>
         <span class="tile-val mono">{{ r.paidByQrScanOrderCount }}</span>
+      </div>
+      <div class="tile tile-qr">
+        <span class="tile-label">Received via QR scan</span>
+        <span class="tile-val mono">{{ r.totalReceivedByQrScan | number: '1.2-2' }}</span>
       </div>
       <div class="tile">
         <span class="tile-label">Change returned</span>
+        <span class="tile-sublabel">from cash only</span>
         <span class="tile-val mono">{{ r.totalChange | number: '1.2-2' }}</span>
       </div>
     </section>
