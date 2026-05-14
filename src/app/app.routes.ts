@@ -53,14 +53,19 @@ export const routes: Routes = [
       import('./zone/zone-list.component').then((m) => m.ZoneListComponent),
   },
   {
-    path: 'kitchens/:id/edit',
+    path: 'kitchens/prep',
     loadComponent: () =>
-      import('./kitchen/kitchen-edit.component').then((m) => m.KitchenEditComponent),
+      import('./kitchen/kitchen-prep.component').then((m) => m.KitchenPrepComponent),
   },
   {
     path: 'kitchens/new',
     loadComponent: () =>
       import('./kitchen/kitchen-add-new.component').then((m) => m.KitchenAddNewComponent),
+  },
+  {
+    path: 'kitchens/:id/edit',
+    loadComponent: () =>
+      import('./kitchen/kitchen-edit.component').then((m) => m.KitchenEditComponent),
   },
   {
     path: 'kitchens',

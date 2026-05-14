@@ -1,0 +1,83 @@
+<div class="prep-page">
+  <a routerLink="/kitchens" class="back">← Kitchens</a>
+  <h1>Kitchen prep</h1>
+  <p class="hint">
+    Only lines with status <strong>WAIT</strong> for unpaid orders that have an assigned <strong>table</strong>
+    (for service in that zone). Sorted by line id for pick-up order. Saved kitchen filter applies as before.
+    Orders refresh automatically every {{ autoRefreshSeconds }} seconds; use Refresh for an immediate reload.
+  </p>
+
+  <div class="toolbar">
+    <label class="field">
+      <span class="label-text">Kitchen</span>
+      <select
+        class="select"
+        [value]="selectedKitchenId()"
+        [disabled]="loadingKitchens()"
+        (change)="onKitchenSelect($any($event.target).value)"
+      >
+        <option value="">All kitchens</option>
+        @for (k of kitchens(); track k.id) {
+          @if (k.id != null) {
+            <option [value]="k.id!">{{ kitchenOptionLabel(k) }}</option>
+          }
+        }
+      </select>
+    </label>
+    <button type="button" class="btn-refresh" [disabled]="loadingOrders()" (click)="refresh()">
+      {{ loadingOrders() ? 'Loading…' : 'Refresh' }}
+    </button>
+  </div>
+
+  @if (loadError(); as le) {
+    <p class="error-banner" role="alert">{{ le }}</p>
+  }
+
+  @if (loadingOrders() && prepRows().length === 0 && !loadError()) {
+    <p class="status">Loading orders…</p>
+  }
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Kitchen</th>
+          <th>Order</th>
+          <th>Table</th>
+          <th>When</th>
+          <th>Item</th>
+          <th>Qty</th>
+          <th>Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of prepRows(); track trackRow($index, row)) {
+          <tr>
+            <td class="mono">{{ row.lineId != null ? row.lineId : '—' }}</td>
+            <td class="mono kitchen-cell">{{ row.kitchenLabel }}</td>
+            <td class="mono">
+              <a [routerLink]="['/orders', row.orderId, 'edit']" class="order-link">{{ row.orderNo }}</a>
+            </td>
+            <td class="mono">
+              {{ row.tableCode }}
+              @if (row.zoneHint) {
+                <span class="muted"> · {{ row.zoneHint }}</span>
+              }
+            </td>
+            <td>{{ row.orderDate | date: 'short' }}</td>
+            <td>{{ row.foodName }}</td>
+            <td class="mono">{{ row.quantity }}</td>
+            <td class="note">{{ row.note ?? '—' }}</td>
+          </tr>
+        } @empty {
+          @if (!loadingOrders()) {
+            <tr>
+              <td colspan="8" class="empty">No waiting lines for this kitchen.</td>
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+  </div>
+</div>
