@@ -234,6 +234,13 @@ td.col-actions {
   color: #166534;
 }
 
+.pay-qr-gate {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: #57534e;
+}
+
 .pay-actions {
   margin-top: 0.8rem;
   display: flex;

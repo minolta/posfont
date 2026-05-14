@@ -227,20 +227,50 @@ export class OrderListComponent {
     this.submitPaymentFromDialog(order, rawPay);
   }
 
-  /** Same amounts as cash pay; records `paid_by_qr_scan` on the order (no scanned payload). */
+  /** Records exact due as tender/change zero; cashier must enter exact total (no change) to enable the button. */
   confirmPayQrFromDialog(): void {
     const order = this.payDialogOrder();
     if (!order || order.id == null) {
       this.closePayDialog();
       return;
     }
-    const amount = Number(this.payInputAmount());
-    const rawPay = buildPayOrderRequest(amount, this.payableTotal(order));
+    if (this.payQrSettlementDisabled(order)) {
+      this.payError.set('Paid by QR needs the entered amount to equal the total (no change).');
+      return;
+    }
+    const due = this.payableTotal(order);
+    const rawPay = buildPayOrderRequest(due, due);
     if ('error' in rawPay) {
       this.payError.set(rawPay.error);
       return;
     }
     this.submitPaymentFromDialog(order, { ...rawPay, paidByQrScan: true });
+  }
+
+  /** Used to disable Paid by QR: exact amount only (no cash change scenario). */
+  payQrSettlementDisabled(order: PosOrder): boolean {
+    const id = order.id ?? 0;
+    if (this.payingId() === id || id <= 0) {
+      return true;
+    }
+    const raw = this.payInputAmount().trim();
+    if (raw === '') {
+      return true;
+    }
+    const amt = Number(raw);
+    if (!Number.isFinite(amt) || amt < 0) {
+      return true;
+    }
+    const due = this.payableTotal(order);
+    if (!Number.isFinite(due)) {
+      return true;
+    }
+    const tenderCents = Math.round(amt * 100);
+    const dueCents = Math.round(due * 100);
+    if (tenderCents < dueCents || tenderCents > dueCents) {
+      return true;
+    }
+    return false;
   }
 
   private submitPaymentFromDialog(order: PosOrder, payBody: PayOrderRequest): void {

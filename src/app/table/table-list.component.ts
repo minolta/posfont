@@ -188,13 +188,43 @@ export class TableListComponent {
       this.closePayDialog();
       return;
     }
-    const amount = Number(this.payInputAmount());
-    const rawPay = buildPayOrderRequest(amount, this.payableTotal(order));
+    if (this.payQrSettlementDisabled(order)) {
+      this.payError.set('Paid by QR needs the entered amount to equal the total (no change).');
+      return;
+    }
+    const due = this.payableTotal(order);
+    const rawPay = buildPayOrderRequest(due, due);
     if ('error' in rawPay) {
       this.payError.set(rawPay.error);
       return;
     }
     this.submitPaymentFromDialog(order, { ...rawPay, paidByQrScan: true });
+  }
+
+  /** Paid by QR only when the entered amount equals the total (no under/over pay). */
+  payQrSettlementDisabled(order: PosOrder): boolean {
+    const id = order.id ?? 0;
+    if (this.payingOrderId() === id || id <= 0) {
+      return true;
+    }
+    const raw = this.payInputAmount().trim();
+    if (raw === '') {
+      return true;
+    }
+    const amt = Number(raw);
+    if (!Number.isFinite(amt) || amt < 0) {
+      return true;
+    }
+    const due = this.payableTotal(order);
+    if (!Number.isFinite(due)) {
+      return true;
+    }
+    const tenderCents = Math.round(amt * 100);
+    const dueCents = Math.round(due * 100);
+    if (tenderCents < dueCents || tenderCents > dueCents) {
+      return true;
+    }
+    return false;
   }
 
   private submitPaymentFromDialog(order: PosOrder, payBody: PayOrderRequest): void {

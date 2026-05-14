@@ -283,6 +283,7 @@
           <p class="pay-change">
             Change: <span class="mono">{{ change | number: '1.2-2' }}</span>
           </p>
+          <p class="pay-qr-gate">Paid by QR is off while there is cash change — set the amount to the <strong>exact</strong> total to use QR.</p>
         }
         <div class="dialog-actions">
           <button
@@ -296,8 +297,8 @@
           <button
             type="button"
             class="pay-btn pay-btn-qr"
-            title="Mark paid as QR / mobile wallet using the amount above"
-            [disabled]="payingId() === po.id || +payInputAmount() < 0 || payInputAmount().trim() === ''"
+            title="Requires exact total (no change); QR settles the amount due."
+            [disabled]="payQrSettlementDisabled(po)"
             (click)="confirmPayQrFromDialog()"
           >
             {{ payingId() === po.id ? 'Paying…' : 'Paid by QR' }}
