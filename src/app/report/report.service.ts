@@ -60,6 +60,16 @@ function payableTotal(o: PosOrder): number {
   }, 0);
 }
 
+/** API may use `paid_by_qr_scan` on the wire even when `paidByQrScan` is missing on the typed model. */
+function readOrderPaidByQrScan(o: PosOrder): boolean {
+  if (o.paidByQrScan === true) {
+    return true;
+  }
+  const r = o as unknown as Record<string, unknown>;
+  const v = r['paid_by_qr_scan'];
+  return v === true || v === 'true' || v === 1 || v === '1';
+}
+
 /** Calendar day cash was settled (preferred for daily cash report). */
 function paidLocalYmd(order: PosOrder): string | null {
   return localYmdFromIso(order.paidAt ?? order.orderDate);
@@ -98,6 +108,9 @@ function normalizeApiRow(raw: unknown): DailyReportTableRow {
   const totalDue = n(row['totalDue'] ?? row['total_due']);
   const pp = row['paidPrice'] ?? row['paid_price'];
   const ch = row['change'] ?? row['change_amount'];
+  const qrRaw = row['paidByQrScan'] ?? row['paid_by_qr_scan'];
+  const paidByQrScan =
+    qrRaw === true || qrRaw === 'true' || qrRaw === 1 || qrRaw === '1';
   return {
     orderId,
     orderNo,
@@ -105,6 +118,7 @@ function normalizeApiRow(raw: unknown): DailyReportTableRow {
     totalDue,
     paidPrice: pp != null && pp !== '' ? n(pp) : null,
     change: ch != null && ch !== '' ? n(ch) : null,
+    paidByQrScan,
   };
 }
 
@@ -124,6 +138,9 @@ function mapApiToDailyReport(raw: DailyReportApiDto, fallbackStart: string, fall
     endDate,
     orderCount: n(raw.orderCount ?? raw.order_count),
     paidOrderCount: n(raw.paidOrderCount ?? raw.paid_order_count),
+    paidByQrScanOrderCount: n(
+      raw.paidByQrScanOrderCount ?? raw.paid_by_qr_scan_order_count,
+    ),
     totalSales: n(raw.totalSales ?? raw.total_sales),
     totalCashReceived: n(raw.totalCashReceived ?? raw.total_cash_received),
     totalChange: n(raw.totalChange ?? raw.total_change),
@@ -149,6 +166,7 @@ function aggregateOrdersClientSide(orders: PosOrder[], start: string, end: strin
   >();
 
   let paidOrderCount = 0;
+  let paidByQrScanOrderCount = 0;
   let totalSales = 0;
   let totalCashReceived = 0;
   let totalChange = 0;
@@ -168,6 +186,10 @@ function aggregateOrdersClientSide(orders: PosOrder[], start: string, end: strin
       continue;
     }
     paidOrderCount += 1;
+    const paidQr = readOrderPaidByQrScan(o);
+    if (paidQr) {
+      paidByQrScanOrderCount += 1;
+    }
     const due = payableTotal(o);
     totalSales += due;
     const pp = readPosOrderPaidPrice(o);
@@ -185,6 +207,7 @@ function aggregateOrdersClientSide(orders: PosOrder[], start: string, end: strin
       totalDue: due,
       paidPrice: pp,
       change: ch,
+      paidByQrScan: paidQr,
     });
     for (const ln of o.lines ?? []) {
       if (resolvedLineStatus(ln, o) === 'CANCEL') {
@@ -219,6 +242,7 @@ function aggregateOrdersClientSide(orders: PosOrder[], start: string, end: strin
     endDate: end,
     orderCount: touchIds.size,
     paidOrderCount,
+    paidByQrScanOrderCount,
     totalSales,
     totalCashReceived,
     totalChange,

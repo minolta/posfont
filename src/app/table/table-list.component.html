@@ -119,7 +119,7 @@
   @if (payDialogOrder(); as po) {
     <div class="dialog-backdrop" (click)="closePayDialog()">
       <div class="pay-dialog" (click)="$event.stopPropagation()">
-        <h3>Confirm payment</h3>
+        <h3>Settle payment</h3>
         <p class="pay-order-no">
           Order: <span class="mono">{{ po.orderNo }}</span>
         </p>
@@ -153,7 +153,16 @@
             [disabled]="payingOrderId() === po.id || +payInputAmount() < 0 || payInputAmount().trim() === ''"
             (click)="confirmPayFromDialog()"
           >
-            {{ payingOrderId() === po.id ? 'Paying…' : 'Confirm pay' }}
+            {{ payingOrderId() === po.id ? 'Paying…' : 'Paid by cash' }}
+          </button>
+          <button
+            type="button"
+            class="new-order-link pay-link pay-link-qr"
+            title="Mark paid as QR / mobile wallet using the amount above"
+            [disabled]="payingOrderId() === po.id || +payInputAmount() < 0 || payInputAmount().trim() === ''"
+            (click)="confirmPayQrFromDialog()"
+          >
+            {{ payingOrderId() === po.id ? 'Paying…' : 'Paid by QR' }}
           </button>
           <button type="button" class="edit-link pay-close-btn" (click)="closePayDialog()">Close</button>
         </div>

@@ -9,9 +9,12 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { catchError, finalize, map, merge, of, switchMap, tap, timer } from 'rxjs';
+import { catchError, finalize, map, merge, of, switchMap, take, tap, timer } from 'rxjs';
 
 import { OrderService } from '../order/order.service';
+import { resolvedLineStatus } from '../order/order-line-status.util';
+import { orderLineRequestNotePart } from '../order/order-line-note.util';
+import { mergeOrderRequestPaymentFromPosOrder } from '../order/order-pay.util';
 import type { PosOrder } from '../order/order.model';
 import type { Kitchen } from './kitchen.model';
 import { KitchenService } from './kitchen.service';
@@ -51,6 +54,8 @@ export class KitchenPrepComponent {
 
   readonly loadingOrders = signal(false);
   readonly loadError = signal<string | null>(null);
+  readonly prepUpdateError = signal<string | null>(null);
+  readonly prepUpdatingKey = signal<string | null>(null);
 
   readonly orders = toSignal(
     merge(
@@ -111,6 +116,66 @@ export class KitchenPrepComponent {
     this.refreshNonce.update((n) => n + 1);
   }
 
+  prepRowUpdateKey(orderId: number, lineIndex: number): string {
+    return `${orderId}:${lineIndex}`;
+  }
+
+  isRowFinishUpdating(orderId: number, lineIndex: number): boolean {
+    return this.prepUpdatingKey() === this.prepRowUpdateKey(orderId, lineIndex);
+  }
+
+  finishCooking(row: KitchenPrepRow): void {
+    const o = (this.orders() ?? []).find((x) => x.id === row.orderId);
+    const tableId = o?.table?.id;
+    if (o == null || o.id == null || tableId == null || o.paid) {
+      return;
+    }
+    const lines = o.lines ?? [];
+    const idx = row.lineIndex;
+    if (idx < 0 || idx >= lines.length) {
+      return;
+    }
+    if (resolvedLineStatus(lines[idx]!, o) !== 'WAIT') {
+      return;
+    }
+    this.prepUpdateError.set(null);
+    const now = new Date().toISOString().slice(0, 19);
+    const body = mergeOrderRequestPaymentFromPosOrder(
+      {
+        orderNo: o.orderNo,
+        tableId,
+        orderDate: o.orderDate ?? now,
+        complateOrder: o.complateOrder,
+        complateOrderDate: o.complateOrderDate,
+        cancel: o.cancel,
+        version: o.version,
+        lines: lines
+          .map((ln, i) => ({
+            foodId: ln.food?.id ?? 0,
+            quantity: ln.quantity,
+            status: i === idx ? ('FINISH_COOKING' as const) : resolvedLineStatus(ln, o),
+            ...orderLineRequestNotePart(ln),
+          }))
+          .filter((ln) => ln.foodId > 0),
+      },
+      o,
+    );
+    const key = this.prepRowUpdateKey(o.id, idx);
+    this.prepUpdatingKey.set(key);
+    this.orderService
+      .updateOrder(o.id, body)
+      .pipe(
+        take(1),
+        finalize(() => this.prepUpdatingKey.set(null)),
+      )
+      .subscribe({
+        next: () => this.refreshNonce.update((n) => n + 1),
+        error: (err: unknown) => {
+          this.prepUpdateError.set(this.fmtPrepUpdateErr(err));
+        },
+      });
+  }
+
   onKitchenSelect(value: string): void {
     const v = value.trim();
     this.selectedKitchenId.set(v);
@@ -129,7 +194,7 @@ export class KitchenPrepComponent {
   }
 
   trackRow(_: number, row: KitchenPrepRow): string {
-    return `${row.orderId}:${row.lineId ?? 'x'}:${row.foodCode}`;
+    return `${row.orderId}:${row.lineIndex}:${row.lineId ?? 'x'}:${row.foodCode}`;
   }
 
   private fmtLoadErr(err: unknown): string {
@@ -137,5 +202,22 @@ export class KitchenPrepComponent {
       return err.message || `Could not load orders (${err.status})`;
     }
     return 'Could not load orders.';
+  }
+
+  private fmtPrepUpdateErr(err: unknown): string {
+    if (err instanceof HttpErrorResponse) {
+      const body = err.error;
+      if (typeof body === 'object' && body !== null && 'message' in body) {
+        const m = (body as { message?: unknown }).message;
+        if (typeof m === 'string' && m.trim().length > 0) {
+          return m;
+        }
+      }
+      if (typeof err.error === 'string' && err.error.trim().length > 0) {
+        return err.error;
+      }
+      return err.message || `Could not update line (${err.status})`;
+    }
+    return 'Could not update line status.';
   }
 }

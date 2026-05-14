@@ -19,7 +19,7 @@ import {
   resolvedLineStatus,
 } from '../order/order-line-status.util';
 import { buildPayOrderRequest, mergePayOrderAmounts } from '../order/order-pay.util';
-import type { OrderLine, PosOrder } from '../order/order.model';
+import type { OrderLine, OrderLineStatus, PayOrderRequest, PosOrder } from '../order/order.model';
 import { OrderService } from '../order/order.service';
 import type { PosTable } from './table.model';
 import { TableService } from './table.service';
@@ -174,12 +174,31 @@ export class TableListComponent {
       return;
     }
     const amount = Number(this.payInputAmount());
-    const payBody = buildPayOrderRequest(amount, this.payableTotal(order));
-    if ('error' in payBody) {
-      this.payError.set(payBody.error);
+    const rawPay = buildPayOrderRequest(amount, this.payableTotal(order));
+    if ('error' in rawPay) {
+      this.payError.set(rawPay.error);
       return;
     }
-    if (order.table?.id == null) {
+    this.submitPaymentFromDialog(order, rawPay);
+  }
+
+  confirmPayQrFromDialog(): void {
+    const order = this.payDialogOrder();
+    if (!order || order.id == null) {
+      this.closePayDialog();
+      return;
+    }
+    const amount = Number(this.payInputAmount());
+    const rawPay = buildPayOrderRequest(amount, this.payableTotal(order));
+    if ('error' in rawPay) {
+      this.payError.set(rawPay.error);
+      return;
+    }
+    this.submitPaymentFromDialog(order, { ...rawPay, paidByQrScan: true });
+  }
+
+  private submitPaymentFromDialog(order: PosOrder, payBody: PayOrderRequest): void {
+    if (order.id == null || order.table?.id == null) {
       this.payError.set('Order has no table reference and cannot be paid.');
       return;
     }
@@ -192,11 +211,12 @@ export class TableListComponent {
     const prepBody = mergePayOrderAmounts(baseBody, payBody);
     this.payingOrderId.set(id);
     this.payError.set(null);
-    const pay$ = this.orderService
+    this.orderService
       .updateOrder(id, prepBody)
-      .pipe(switchMap(() => this.orderService.payOrder(id, payBody)));
-    pay$
-      .pipe(finalize(() => this.payingOrderId.set(null)))
+      .pipe(
+        switchMap(() => this.orderService.payOrder(id, payBody)),
+        finalize(() => this.payingOrderId.set(null)),
+      )
       .subscribe({
         next: () => {
           this.closePayDialog();
@@ -238,7 +258,7 @@ export class TableListComponent {
     return cents / 100;
   }
 
-  lineStatus(line: OrderLine, order: PosOrder): 'WAIT' | 'COMPLETE' | 'CANCEL' {
+  lineStatus(line: OrderLine, order: PosOrder): OrderLineStatus {
     return resolvedLineStatus(line, order);
   }
 

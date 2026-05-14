@@ -1,4 +1,4 @@
-import type { OrderLine, OrderRequest, PosOrder } from './order.model';
+import type { OrderLine, OrderLineStatus, OrderRequest, PosOrder } from './order.model';
 import { mergeOrderRequestPaymentFromPosOrder } from './order-pay.util';
 import { orderLineRequestNotePart } from './order-line-note.util';
 
@@ -6,12 +6,16 @@ import { orderLineRequestNotePart } from './order-line-note.util';
 export function resolvedLineStatus(
   line: OrderLine,
   order: PosOrder,
-): 'WAIT' | 'COMPLETE' | 'CANCEL' {
+): OrderLineStatus {
   const raw = line.status as string | null | undefined;
   if (raw) {
     const u = String(raw).toUpperCase();
-    if (u === 'WAIT' || u === 'COMPLETE' || u === 'CANCEL') {
-      return u;
+    if (u === 'WAIT' || u === 'FINISH_COOKING' || u === 'COMPLETE' || u === 'CANCEL') {
+      return u as OrderLineStatus;
+    }
+    // Legacy alias if the API still returns the old token
+    if (u === 'CANSHIPNEW') {
+      return 'FINISH_COOKING';
     }
   }
   if (order.cancel) {

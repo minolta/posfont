@@ -4,7 +4,7 @@
     <div>
       <h1>Daily report</h1>
       <p class="hint">
-        Choose dates and refresh. Figures are for orders <strong>paid</strong> in that range; if the report service is unavailable, totals are estimated from your order list.
+        Choose dates and refresh. Figures are for orders <strong>paid</strong> in that range. Each row shows whether settlement was <strong>cash</strong> or <strong>QR scan</strong>. If the report service is unavailable, totals are estimated from your order list.
       </p>
     </div>
     <div class="controls">
@@ -70,6 +70,10 @@
         <span class="tile-label">Cash received</span>
         <span class="tile-val mono">{{ r.totalCashReceived | number: '1.2-2' }}</span>
       </div>
+      <div class="tile tile-qr">
+        <span class="tile-label">Paid by QR scan</span>
+        <span class="tile-val mono">{{ r.paidByQrScanOrderCount }}</span>
+      </div>
       <div class="tile">
         <span class="tile-label">Change returned</span>
         <span class="tile-val mono">{{ r.totalChange | number: '1.2-2' }}</span>
@@ -82,6 +86,7 @@
           <tr>
             <th>Order</th>
             <th>Paid at</th>
+            <th>Payment</th>
             <th>Due</th>
             <th>Received</th>
             <th>Change</th>
@@ -94,13 +99,20 @@
                 <a [routerLink]="['/orders', row.orderId, 'edit']" class="order-link">{{ row.orderNo }}</a>
               </td>
               <td>{{ row.paidAt | date: 'short' }}</td>
+              <td>
+                @if (row.paidByQrScan) {
+                  <span class="pay-kind pay-kind-qr">QR</span>
+                } @else {
+                  <span class="pay-kind pay-kind-cash">Cash</span>
+                }
+              </td>
               <td class="mono">{{ row.totalDue | number: '1.2-2' }}</td>
               <td class="mono">{{ row.paidPrice != null ? (row.paidPrice | number: '1.2-2') : '—' }}</td>
               <td class="mono">{{ row.change != null ? (row.change | number: '1.2-2') : '—' }}</td>
             </tr>
           } @empty {
             <tr>
-              <td colspan="5" class="empty">No paid orders for this date range.</td>
+              <td colspan="6" class="empty">No paid orders for this date range.</td>
             </tr>
           }
         </tbody>

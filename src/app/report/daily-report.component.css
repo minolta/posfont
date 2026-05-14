@@ -179,6 +179,11 @@ h1 {
   background: #f7fef9;
 }
 
+.tile-qr {
+  border-color: #99f6e4;
+  background: #f0fdfa;
+}
+
 .tile-label {
   display: block;
   font-size: 0.72rem;
@@ -239,6 +244,28 @@ tr:last-child td {
 
 .order-link:hover {
   text-decoration: underline;
+}
+
+.pay-kind {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.18rem 0.45rem;
+  border-radius: 999px;
+}
+
+.pay-kind-qr {
+  color: #0f766e;
+  background: #ccfbf1;
+  border: 1px solid #5eead4;
+}
+
+.pay-kind-cash {
+  color: #92400e;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
 }
 
 .empty {

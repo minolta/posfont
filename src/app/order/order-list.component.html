@@ -199,10 +199,11 @@
                             <span
                               class="line-status"
                               [class.wait]="lineStatus(ln, o) === 'WAIT'"
+                              [class.finish-cooking]="lineStatus(ln, o) === 'FINISH_COOKING'"
                               [class.complete]="lineStatus(ln, o) === 'COMPLETE'"
                               [class.cancel]="lineStatus(ln, o) === 'CANCEL'"
-                              [attr.title]="lineStatus(ln, o)"
-                              [attr.aria-label]="lineStatus(ln, o)"
+                              [attr.title]="lineStatusLabel(lineStatus(ln, o))"
+                              [attr.aria-label]="lineStatusLabel(lineStatus(ln, o))"
                             >
                               {{ lineStatusIcon(lineStatus(ln, o)) }}
                             </span>
@@ -256,7 +257,7 @@
   @if (payDialogOrder(); as po) {
     <div class="dialog-backdrop" (click)="closePayDialog()">
       <div class="pay-dialog" (click)="$event.stopPropagation()">
-        <h3>Confirm payment</h3>
+        <h3>Settle payment</h3>
         <p class="dialog-order-no">
           Order: <span class="mono">{{ po.orderNo }}</span>
         </p>
@@ -290,7 +291,16 @@
             [disabled]="payingId() === po.id || +payInputAmount() < 0 || payInputAmount().trim() === ''"
             (click)="confirmPayFromDialog()"
           >
-            {{ payingId() === po.id ? 'Paying…' : 'Confirm pay' }}
+            {{ payingId() === po.id ? 'Paying…' : 'Paid by cash' }}
+          </button>
+          <button
+            type="button"
+            class="pay-btn pay-btn-qr"
+            title="Mark paid as QR / mobile wallet using the amount above"
+            [disabled]="payingId() === po.id || +payInputAmount() < 0 || payInputAmount().trim() === ''"
+            (click)="confirmPayQrFromDialog()"
+          >
+            {{ payingId() === po.id ? 'Paying…' : 'Paid by QR' }}
           </button>
           <button type="button" class="dialog-cancel-btn" (click)="closePayDialog()">Close</button>
         </div>

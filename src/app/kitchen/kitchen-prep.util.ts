@@ -16,6 +16,8 @@ export interface KitchenPrepRow {
   kitchenId: number | null;
   /** Display label from the line’s food kitchen. */
   kitchenLabel: string;
+  /** Index into `PosOrder.lines` for PUT updates. */
+  lineIndex: number;
 }
 
 /**
@@ -33,7 +35,9 @@ export function buildKitchenPrepRows(orders: PosOrder[], kitchenIdFilter: number
     if (table == null || table.id == null) {
       continue;
     }
-    for (const ln of o.lines ?? []) {
+    const linesList = o.lines ?? [];
+    for (let lineIndex = 0; lineIndex < linesList.length; lineIndex++) {
+      const ln = linesList[lineIndex]!;
       if (resolvedLineStatus(ln, o) !== 'WAIT') {
         continue;
       }
@@ -73,6 +77,7 @@ export function buildKitchenPrepRows(orders: PosOrder[], kitchenIdFilter: number
         note: lineKitchenNote(ln),
         kitchenId: kid,
         kitchenLabel,
+        lineIndex,
       });
     }
   }

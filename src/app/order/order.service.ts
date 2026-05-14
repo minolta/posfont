@@ -52,4 +52,28 @@ export class OrderService {
   payOrder(id: number, body: PayOrderRequest): Observable<PosOrder> {
     return this.http.post<PosOrder>(`${this.rootUrl}/${id}/pay`, payRequestToWireBody(body));
   }
+
+  /**
+   * `POST /api/orders/{id}/pay/qr-scan` — same as {@link payOrder} after scanning a payment QR (PromptPay etc.).
+   * Sends `paidByQrScan` + `qrScanPayload`; optional amounts overlay the order like `POST …/pay`.
+   */
+  payOrderByQrScan(
+    id: number,
+    body: { qrScanPayload: string; paidPrice?: number; change?: number },
+  ): Observable<PosOrder> {
+    const clipped = body.qrScanPayload.trim().slice(0, 1024);
+    const wire: Record<string, unknown> = {
+      qrScanPayload: clipped,
+      qr_scan_payload: clipped,
+    };
+    if (body.paidPrice != null) {
+      wire['paidPrice'] = body.paidPrice;
+      wire['paid_price'] = body.paidPrice;
+    }
+    if (body.change != null) {
+      wire['change'] = body.change;
+      wire['change_amount'] = body.change;
+    }
+    return this.http.post<PosOrder>(`${this.rootUrl}/${id}/pay/qr-scan`, wire);
+  }
 }

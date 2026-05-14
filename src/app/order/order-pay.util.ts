@@ -148,12 +148,33 @@ export function orderRequestToWireBody(body: OrderRequest): Record<string, unkno
 
 /** JSON body for POST …/pay — same casing as order update. */
 export function payRequestToWireBody(p: PayOrderRequest): Record<string, unknown> {
-  return {
+  const out: Record<string, unknown> = {
     paidPrice: p.paidPrice,
     paid_price: p.paidPrice,
     change: p.change,
     change_amount: p.change,
   };
+  if (p.paidByQrScan === true) {
+    out['paidByQrScan'] = true;
+    out['paid_by_qr_scan'] = true;
+  }
+  const qr = typeof p.qrScanPayload === 'string' ? p.qrScanPayload.trim() : '';
+  if (qr.length > 0) {
+    const clipped = qr.length > 1024 ? qr.slice(0, 1024) : qr;
+    out['qrScanPayload'] = clipped;
+    out['qr_scan_payload'] = clipped;
+  }
+  return out;
+}
+
+/** If the cashier pasted scanned QR text, attach it so the API records `paid_by_qr_scan`. */
+export function applyQrScanToPayBody(pay: PayOrderRequest, qrRaw: string | null | undefined): PayOrderRequest {
+  const trimmed = qrRaw?.trim() ?? '';
+  if (trimmed === '') {
+    return pay;
+  }
+  const qrScanPayload = trimmed.length > 1024 ? trimmed.slice(0, 1024) : trimmed;
+  return { ...pay, paidByQrScan: true, qrScanPayload };
 }
 
 /** Sets `paidPrice` and `change` from the pay dialog (final values sent on PUT before `POST /pay`). */

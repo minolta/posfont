@@ -24,7 +24,7 @@ import {
 } from './order-line-status.util';
 import { buildPayOrderRequest, mergeOrderRequestPaymentFromPosOrder, mergePayOrderAmounts, readPosOrderPaidPrice } from './order-pay.util';
 import { lineKitchenNote, orderLineRequestNotePart } from './order-line-note.util';
-import type { OrderLine, OrderRequest, PosOrder } from './order.model';
+import type { OrderLine, OrderLineStatus, OrderRequest, PayOrderRequest, PosOrder } from './order.model';
 import { OrderService } from './order.service';
 
 @Component({
@@ -219,12 +219,32 @@ export class OrderListComponent {
       return;
     }
     const amount = Number(this.payInputAmount());
-    const payBody = buildPayOrderRequest(amount, this.payableTotal(order));
-    if ('error' in payBody) {
-      this.payError.set(payBody.error);
+    const rawPay = buildPayOrderRequest(amount, this.payableTotal(order));
+    if ('error' in rawPay) {
+      this.payError.set(rawPay.error);
       return;
     }
-    if (order.table?.id == null) {
+    this.submitPaymentFromDialog(order, rawPay);
+  }
+
+  /** Same amounts as cash pay; records `paid_by_qr_scan` on the order (no scanned payload). */
+  confirmPayQrFromDialog(): void {
+    const order = this.payDialogOrder();
+    if (!order || order.id == null) {
+      this.closePayDialog();
+      return;
+    }
+    const amount = Number(this.payInputAmount());
+    const rawPay = buildPayOrderRequest(amount, this.payableTotal(order));
+    if ('error' in rawPay) {
+      this.payError.set(rawPay.error);
+      return;
+    }
+    this.submitPaymentFromDialog(order, { ...rawPay, paidByQrScan: true });
+  }
+
+  private submitPaymentFromDialog(order: PosOrder, payBody: PayOrderRequest): void {
+    if (order.id == null || order.table?.id == null) {
       this.payError.set('Order has no table reference and cannot be paid.');
       return;
     }
@@ -237,11 +257,12 @@ export class OrderListComponent {
     const prepBody = mergePayOrderAmounts(baseBody, payBody);
     this.payingId.set(id);
     this.payError.set(null);
-    const pay$ = this.orderService
+    this.orderService
       .updateOrder(id, prepBody)
-      .pipe(switchMap(() => this.orderService.payOrder(id, payBody)));
-    pay$
-      .pipe(finalize(() => this.payingId.set(null)))
+      .pipe(
+        switchMap(() => this.orderService.payOrder(id, payBody)),
+        finalize(() => this.payingId.set(null)),
+      )
       .subscribe({
         next: () => {
           this.closePayDialog();
@@ -333,18 +354,29 @@ export class OrderListComponent {
     });
   }
 
-  lineStatus(line: OrderLine, order: PosOrder): 'WAIT' | 'COMPLETE' | 'CANCEL' {
+  lineStatus(line: OrderLine, order: PosOrder): OrderLineStatus {
     return resolvedLineStatus(line, order);
   }
 
-  lineStatusIcon(status: 'WAIT' | 'COMPLETE' | 'CANCEL'): string {
+  lineStatusIcon(status: OrderLineStatus): string {
     if (status === 'COMPLETE') {
       return '✓';
     }
     if (status === 'CANCEL') {
       return '✕';
     }
+    if (status === 'FINISH_COOKING') {
+      return '📦';
+    }
     return '⏳';
+  }
+
+  /** Label for tooltips / accessibility (API uses `FINISH_COOKING`, etc.). */
+  lineStatusLabel(status: OrderLineStatus): string {
+    if (status === 'FINISH_COOKING') {
+      return 'Finish cooking';
+    }
+    return status === 'COMPLETE' ? 'Complete' : status === 'CANCEL' ? 'Cancel' : 'Wait';
   }
 
   private lineUpdateKey(orderId: number, lineIndex: number): string {
@@ -501,7 +533,7 @@ export class OrderListComponent {
     this.expandedOrderId.update((curr) => (curr === orderId ? null : orderId));
   }
 
-  orderLineStatus(o: PosOrder): 'WAIT' | 'COMPLETE' | 'CANCEL' {
+  orderLineStatus(o: PosOrder): OrderLineStatus {
     if (o.cancel) {
       return 'CANCEL';
     }

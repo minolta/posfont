@@ -22,8 +22,9 @@ import {
   normalizeLocalDateTimeForApi,
 } from './order-datetime.util';
 import { mergeFoodsFromApis, mergeTablesFromApis, foodPickerLabel, tablePickerLabel } from './order-merge.util';
-import type { OrderLine, OrderRequest, PosOrder } from './order.model';
+import type { OrderLine, OrderLineStatus, OrderRequest, PosOrder } from './order.model';
 import { lineKitchenNote, trimNewLineNote } from './order-line-note.util';
+import { resolvedLineStatus } from './order-line-status.util';
 import { mergeOrderRequestPaymentFromPosOrder, readPosOrderChange, readPosOrderPaidPrice } from './order-pay.util';
 import { OrderService } from './order.service';
 
@@ -221,17 +222,8 @@ export class OrderEditComponent {
       .join('; ');
   }
 
-  lineStatus(line: OrderLine, order: PosOrder): 'WAIT' | 'COMPLETE' | 'CANCEL' {
-    if (line.status) {
-      return line.status;
-    }
-    if (order.cancel) {
-      return 'CANCEL';
-    }
-    if (order.complateOrder || order.paid) {
-      return 'COMPLETE';
-    }
-    return 'WAIT';
+  lineStatus(line: OrderLine, order: PosOrder): OrderLineStatus {
+    return resolvedLineStatus(line, order);
   }
 
   totalPay(o: PosOrder): number {

@@ -165,6 +165,17 @@ td.col-actions {
   cursor: not-allowed;
 }
 
+.pay-btn-qr {
+  margin-right: 0;
+  color: #0f766e;
+  background: #ecfdf5;
+  border-color: #99f6e4;
+}
+
+.pay-btn-qr:hover:not(:disabled) {
+  background: #ccfbf1;
+}
+
 .quick-line {
   display: inline-flex;
   align-items: center;
@@ -514,6 +525,11 @@ td.col-actions {
 .line-status.wait {
   color: #92400e;
   background: #fef3c7;
+}
+
+.line-status.finish-cooking {
+  color: #0f766e;
+  background: #ccfbf1;
 }
 
 .line-status.complete {

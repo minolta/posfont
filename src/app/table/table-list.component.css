@@ -152,6 +152,16 @@ td.col-actions {
   background: #dbeafe;
 }
 
+.new-order-link.pay-link.pay-link-qr {
+  color: #0f766e;
+  background: #ecfdf5;
+  border-color: #99f6e4;
+}
+
+.new-order-link.pay-link.pay-link-qr:hover:not(:disabled) {
+  background: #ccfbf1;
+}
+
 .new-order-link.add-line-link {
   color: #1d4ed8;
   background: #eff6ff;
@@ -229,6 +239,7 @@ td.col-actions {
   display: flex;
   gap: 0.5rem;
   justify-content: flex-end;
+  flex-wrap: wrap;
 }
 
 .pay-close-btn {

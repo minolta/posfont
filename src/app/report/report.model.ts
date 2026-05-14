@@ -13,6 +13,8 @@ export interface DailyReportRow {
   paid_price?: number | null;
   change?: number | null;
   change_amount?: number | null;
+  paidByQrScan?: boolean | null;
+  paid_by_qr_scan?: boolean | null;
 }
 
 /** Paid lines rolled up per food (`GET /api/reports/daily`). */
@@ -37,6 +39,8 @@ export interface DailyReportApiDto {
   order_count?: number | null;
   paidOrderCount?: number | null;
   paid_order_count?: number | null;
+  paidByQrScanOrderCount?: number | null;
+  paid_by_qr_scan_order_count?: number | null;
   totalSales?: number | null;
   total_sales?: number | null;
   totalCashReceived?: number | null;
@@ -56,6 +60,7 @@ export interface DailyReport {
   endDate: string;
   orderCount: number;
   paidOrderCount: number;
+  paidByQrScanOrderCount: number;
   totalSales: number;
   totalCashReceived: number;
   totalChange: number;
@@ -79,4 +84,5 @@ export interface DailyReportTableRow {
   totalDue: number;
   paidPrice: number | null;
   change: number | null;
+  paidByQrScan: boolean;
 }

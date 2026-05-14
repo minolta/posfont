@@ -81,6 +81,38 @@ h1 {
   cursor: not-allowed;
 }
 
+.prep-action-error {
+  background: #fff7ed;
+  color: #9a3412;
+  border-color: #fed7aa;
+}
+
+.btn-finish-cook {
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.35rem 0.65rem;
+  border-radius: 6px;
+  border: 1px solid #15803d;
+  background: #22c55e;
+  color: #fff;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-finish-cook:hover:not(:disabled) {
+  background: #16a34a;
+}
+
+.btn-finish-cook:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.prep-action-cell {
+  white-space: nowrap;
+}
+
 .status {
   font-size: 0.875rem;
   color: #5c5c5c;
