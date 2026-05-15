@@ -25,7 +25,12 @@ import { mergeFoodsFromApis, mergeTablesFromApis, foodPickerLabel, tablePickerLa
 import type { OrderLine, OrderLineStatus, OrderRequest, PosOrder } from './order.model';
 import { lineKitchenNote, trimNewLineNote } from './order-line-note.util';
 import { resolvedLineStatus } from './order-line-status.util';
-import { mergeOrderRequestPaymentFromPosOrder, readPosOrderChange, readPosOrderPaidPrice } from './order-pay.util';
+import {
+  mergeOrderRequestPaymentFromPosOrder,
+  readOrderPaidByQrScan,
+  readPosOrderChange,
+  readPosOrderPaidPrice,
+} from './order-pay.util';
 import { OrderService } from './order.service';
 
 @Component({
@@ -237,6 +242,11 @@ export class OrderEditComponent {
 
   paidAmountTendered(o: PosOrder): number | null {
     return readPosOrderPaidPrice(o);
+  }
+
+  /** How the order was settled when paid (cash vs QR scan). */
+  paidSettlementLabel(o: PosOrder): string {
+    return readOrderPaidByQrScan(o) ? 'QR scan' : 'Cash';
   }
 
   /** Stored change from API, or paid price minus line total when paid price is known. */

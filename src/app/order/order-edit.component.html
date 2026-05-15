@@ -23,6 +23,8 @@
         <dd>{{ formatDateShort(vo.orderDate) }}</dd>
         <dt>Paid at</dt>
         <dd>{{ formatDateShort(vo.paidAt) }}</dd>
+        <dt>Payment method</dt>
+        <dd>{{ paidSettlementLabel(vo) }}</dd>
         <dt>Total pay</dt>
         <dd class="mono">{{ totalPay(vo) | number: '1.2-2' }}</dd>
         <dt>Amount received</dt>

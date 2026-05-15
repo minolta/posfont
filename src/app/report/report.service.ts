@@ -5,7 +5,7 @@ import { Observable, catchError, map, throwError } from 'rxjs';
 import { POS_API_BASE_URL } from '../api/pos-api-base-url.token';
 import { resolvedLineStatus } from '../order/order-line-status.util';
 import type { PosOrder } from '../order/order.model';
-import { readPosOrderChange, readPosOrderPaidPrice } from '../order/order-pay.util';
+import { readOrderPaidByQrScan, readPosOrderChange, readPosOrderPaidPrice } from '../order/order-pay.util';
 import { OrderService } from '../order/order.service';
 
 import type { DailyReport, DailyReportApiDto, DailyReportFoodTableRow, DailyReportTableRow } from './report.model';
@@ -58,16 +58,6 @@ function payableTotal(o: PosOrder): number {
     }
     return sum + ln.quantity * ln.unitPrice;
   }, 0);
-}
-
-/** API may use `paid_by_qr_scan` on the wire even when `paidByQrScan` is missing on the typed model. */
-function readOrderPaidByQrScan(o: PosOrder): boolean {
-  if (o.paidByQrScan === true) {
-    return true;
-  }
-  const r = o as unknown as Record<string, unknown>;
-  const v = r['paid_by_qr_scan'];
-  return v === true || v === 'true' || v === 1 || v === '1';
 }
 
 /** Calendar day cash was settled (preferred for daily cash report). */

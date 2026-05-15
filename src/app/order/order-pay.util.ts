@@ -50,6 +50,16 @@ export function readPosOrderChange(o: PosOrder): number | null {
   return firstFiniteNumber(o as unknown as Record<string, unknown>, CHANGE_KEYS);
 }
 
+/** True when settlement was recorded as QR / mobile scan (`paidByQrScan` / `paid_by_qr_scan` on API JSON). */
+export function readOrderPaidByQrScan(o: PosOrder): boolean {
+  if (o.paidByQrScan === true) {
+    return true;
+  }
+  const r = o as unknown as Record<string, unknown>;
+  const v = r['paid_by_qr_scan'];
+  return v === true || v === 'true' || v === 1 || v === '1';
+}
+
 function finiteField(v: unknown): number | null {
   if (typeof v === 'number' && Number.isFinite(v)) {
     return Math.round(v * 100) / 100;
