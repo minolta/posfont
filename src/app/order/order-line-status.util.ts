@@ -1,5 +1,5 @@
 import type { OrderLine, OrderLineStatus, OrderRequest, PosOrder } from './order.model';
-import { mergeOrderRequestPaymentFromPosOrder } from './order-pay.util';
+import { mergeOrderRequestPaymentFromPosOrder, readPosOrderNote, trimOrderNote } from './order-pay.util';
 import { orderLineRequestNotePart } from './order-line-note.util';
 
 /** Normalizes API line status (e.g. uppercase) and order-level flags. */
@@ -41,6 +41,7 @@ export function orderRequestCompleteAllExceptCanceled(order: PosOrder): OrderReq
     return null;
   }
   const now = new Date().toISOString().slice(0, 19);
+  const orderNoteWire = trimOrderNote(readPosOrderNote(order) ?? '');
   return mergeOrderRequestPaymentFromPosOrder(
     {
       orderNo: order.orderNo,
@@ -50,6 +51,7 @@ export function orderRequestCompleteAllExceptCanceled(order: PosOrder): OrderReq
       complateOrderDate: order.complateOrderDate,
       cancel: order.cancel,
       version: order.version,
+      ...(orderNoteWire !== undefined ? { note: orderNoteWire } : {}),
       lines: (order.lines ?? [])
         .map((ln) => {
           const status: 'CANCEL' | 'COMPLETE' =

@@ -1,4 +1,10 @@
-import type { OrderLineRequest, OrderRequest, PayOrderRequest, PosOrder } from './order.model';
+import type {
+  OrderLineRequest,
+  OrderRequest,
+  PatchOrderNoteRequest,
+  PayOrderRequest,
+  PosOrder,
+} from './order.model';
 
 export type PayOrderRequestResult = PayOrderRequest | { error: string };
 
@@ -58,6 +64,47 @@ export function readOrderPaidByQrScan(o: PosOrder): boolean {
   const r = o as unknown as Record<string, unknown>;
   const v = r['paid_by_qr_scan'];
   return v === true || v === 'true' || v === 1 || v === '1';
+}
+
+/** True when settlement was recorded as card/credit (`paidByCredit` / `paid_by_credit`). */
+export function readOrderPaidByCredit(o: PosOrder): boolean {
+  if (o.paidByCredit === true) {
+    return true;
+  }
+  const r = o as unknown as Record<string, unknown>;
+  const v = r['paid_by_credit'];
+  return v === true || v === 'true' || v === 1 || v === '1';
+}
+
+/** Whole-order note from API (`note` / `order_note` / `orderNote`), not line kitchen text. */
+export function readPosOrderNote(o: PosOrder): string | null {
+  const r = o as unknown as Record<string, unknown>;
+  const v = o.note ?? r['order_note'] ?? r['orderNote'];
+  if (typeof v !== 'string') {
+    return null;
+  }
+  const t = v.trim();
+  return t.length > 0 ? t : null;
+}
+
+/** Trim for PUT/POST; max 2000 to match server. */
+export function trimOrderNote(raw: unknown): string | undefined {
+  if (typeof raw !== 'string') {
+    return undefined;
+  }
+  const t = raw.trim().slice(0, 2000);
+  return t.length > 0 ? t : undefined;
+}
+
+/** Label for customer receipt / display after payment. */
+export function orderPaymentMethodLabel(o: PosOrder): string {
+  if (readOrderPaidByQrScan(o)) {
+    return 'QR scan';
+  }
+  if (readOrderPaidByCredit(o)) {
+    return 'Credit card';
+  }
+  return 'Cash';
 }
 
 function finiteField(v: unknown): number | null {
@@ -153,7 +200,20 @@ export function orderRequestToWireBody(body: OrderRequest): Record<string, unkno
     out['change'] = ch;
     out['change_amount'] = ch;
   }
+  if (body.note !== undefined) {
+    const t = typeof body.note === 'string' ? body.note.trim().slice(0, 2000) : '';
+    out['note'] = t;
+    out['order_note'] = t;
+  }
   return out;
+}
+
+/**
+ * JSON for `PATCH /api/orders/{id}/note` — Spring DTO `PatchOrderNoteRequest` (`note`, `version` only).
+ */
+export function patchOrderNoteToWire(body: PatchOrderNoteRequest): Record<string, unknown> {
+  const t = typeof body.note === 'string' ? body.note.trim().slice(0, 2000) : '';
+  return { note: t, version: body.version };
 }
 
 /** JSON body for POST …/pay — same casing as order update. */
@@ -167,6 +227,10 @@ export function payRequestToWireBody(p: PayOrderRequest): Record<string, unknown
   if (p.paidByQrScan === true) {
     out['paidByQrScan'] = true;
     out['paid_by_qr_scan'] = true;
+  }
+  if (p.paidByCredit === true) {
+    out['paidByCredit'] = true;
+    out['paid_by_credit'] = true;
   }
   const qr = typeof p.qrScanPayload === 'string' ? p.qrScanPayload.trim() : '';
   if (qr.length > 0) {

@@ -15,6 +15,8 @@ export interface DailyReportRow {
   change_amount?: number | null;
   paidByQrScan?: boolean | null;
   paid_by_qr_scan?: boolean | null;
+  paidByCredit?: boolean | null;
+  paid_by_credit?: boolean | null;
 }
 
 /** Paid lines rolled up per food (`GET /api/reports/daily`). */
@@ -41,9 +43,13 @@ export interface DailyReportApiDto {
   paid_order_count?: number | null;
   paidByQrScanOrderCount?: number | null;
   paid_by_qr_scan_order_count?: number | null;
+  paidByCreditOrderCount?: number | null;
+  paid_by_credit_order_count?: number | null;
   /** Optional server sum of amounts received for QR-settled orders; UI also derives from rows when absent. */
   totalReceivedByQrScan?: number | null;
   total_received_by_qr_scan?: number | null;
+  totalReceivedByCredit?: number | null;
+  total_received_by_credit?: number | null;
   totalSales?: number | null;
   total_sales?: number | null;
   totalCashReceived?: number | null;
@@ -64,14 +70,18 @@ export interface DailyReport {
   orderCount: number;
   paidOrderCount: number;
   paidByQrScanOrderCount: number;
+  /** Paid orders settled by credit card. */
+  paidByCreditOrderCount: number;
   /** Sum of money received for orders settled by QR (`paidPrice` when set, otherwise line total due). */
   totalReceivedByQrScan: number;
-  /** Cash-side sales due: total sales due minus QR received totals. */
+  /** Sum of money received for credit-settled orders (`paidPrice` when set, otherwise line total due). */
+  totalReceivedByCredit: number;
+  /** Cash-side sales due: total sales due minus QR and credit received totals. */
   realCashSalesDueInShop: number;
   totalSales: number;
-  /** Sum of tendered amounts for cash-paid orders only (QR excluded). */
+  /** Sum of tendered amounts for cash-paid orders only (QR and credit excluded). */
   totalCashReceived: number;
-  /** Change returned on cash-paid orders only (QR excluded). */
+  /** Change returned on cash-paid orders only (QR and credit excluded). */
   totalChange: number;
   source: 'api' | 'client';
   rows: DailyReportTableRow[];
@@ -94,4 +104,5 @@ export interface DailyReportTableRow {
   paidPrice: number | null;
   change: number | null;
   paidByQrScan: boolean;
+  paidByCredit: boolean;
 }

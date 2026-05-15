@@ -54,6 +54,25 @@ h1 {
   border-color: #2563eb;
 }
 
+.filter-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #333;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.filter-done input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: #2563eb;
+  cursor: pointer;
+}
+
 .status {
   font-size: 0.875rem;
   color: #5c5c5c;
@@ -143,6 +162,35 @@ td.col-actions {
   text-decoration: underline;
 }
 
+/* Same pill styling as daily report (Payment column). */
+.pay-kind {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.18rem 0.45rem;
+  border-radius: 999px;
+}
+
+.pay-kind-qr {
+  color: #0f766e;
+  background: #ccfbf1;
+  border: 1px solid #5eead4;
+}
+
+.pay-kind-credit {
+  color: #5b21b6;
+  background: #ede9fe;
+  border: 1px solid #c4b5fd;
+}
+
+.pay-kind-cash {
+  color: #92400e;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+}
+
 .pay-btn {
   font: inherit;
   font-size: 0.85rem;
@@ -174,6 +222,65 @@ td.col-actions {
 
 .pay-btn-qr:hover:not(:disabled) {
   background: #ccfbf1;
+}
+
+.pay-btn-credit {
+  margin-right: 0;
+  color: #5b21b6;
+  background: #f5f3ff;
+  border-color: #c4b5fd;
+}
+
+.pay-btn-credit:hover:not(:disabled) {
+  background: #ede9fe;
+}
+
+.customer-display-inline-btn {
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #0369a1;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  margin-right: 0.35rem;
+}
+
+.customer-display-inline-btn:hover:not(:disabled) {
+  background: #e0f2fe;
+}
+
+.customer-display-inline-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.pay-dialog-customer {
+  margin: 0.25rem 0 0.65rem;
+  text-align: center;
+}
+
+.customer-display-btn {
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #0369a1;
+  background: #f0f9ff;
+  border: 1px solid #7dd3fc;
+  border-radius: 999px;
+  padding: 0.35rem 0.95rem;
+  cursor: pointer;
+}
+
+.customer-display-btn:hover:not(:disabled) {
+  background: #e0f2fe;
+}
+
+.customer-display-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .quick-line {
@@ -271,6 +378,53 @@ td.col-actions {
 .pay-dialog h3 {
   margin: 0 0 0.35rem;
   font-size: 1rem;
+}
+
+.pay-dialog-order-note {
+  margin: 0.5rem 0 0.55rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 6px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: #374151;
+}
+
+.pay-dialog-note-error {
+  margin: 0 0 0.4rem;
+  font-size: 0.82rem;
+  color: #b91c1c;
+}
+
+.pay-dialog-order-note-input {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0.35rem 0 0.45rem;
+  min-height: 2.75rem;
+  resize: vertical;
+  font: inherit;
+  line-height: 1.35;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.pay-dialog-order-note-input:focus {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
+  border-color: #2563eb;
+}
+
+.pay-dialog-order-note-label {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6b7280;
+  margin-bottom: 0.25rem;
 }
 
 .pay-total {
@@ -553,6 +707,71 @@ td.col-actions {
   color: #b91c1c;
   font-size: 0.9rem;
   margin: 0 0 0.75rem;
+}
+
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+  margin-top: 0.85rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid #e2e2e2;
+  background: #fafafa;
+  font-size: 0.875rem;
+}
+
+.pager-summary {
+  color: #333;
+  font-weight: 500;
+}
+
+.pager-meta {
+  color: #5c5c5c;
+}
+
+.pager-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #444;
+  font-size: 0.8125rem;
+}
+
+.pager-size select {
+  font: inherit;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #c8c8c8;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.pager-btns {
+  margin-left: auto;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.pager-btn {
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid #c8c8c8;
+  background: #fff;
+  color: #333;
+  cursor: pointer;
+}
+
+.pager-btn:hover:not(:disabled) {
+  background: #f0f0f0;
+}
+
+.pager-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .table-wrap {

@@ -29,6 +29,14 @@
         (input)="onSearchInput($any($event.target).value)"
       />
     </div>
+    <label class="filter-done">
+      <input
+        type="checkbox"
+        [checked]="showOnlyNotDone()"
+        (change)="onShowOnlyNotDone($any($event.target).checked)"
+      />
+      Show only not done
+    </label>
     @if (loading()) {
       <span class="status" aria-live="polite">Loading…</span>
     }
@@ -63,6 +71,7 @@
           <th>Done</th>
           <th>Cancel</th>
           <th>Paid</th>
+          <th>Payment</th>
           <th title="Cash tendered (paidPrice)—for reporting">Rec’d</th>
           <th>Total/Pay</th>
           <th>Ver.</th>
@@ -72,10 +81,10 @@
       <tbody>
         @if (loading() && orders().length === 0) {
           <tr>
-            <td class="empty" colspan="12">Loading…</td>
+            <td class="empty" colspan="13">Loading…</td>
           </tr>
         }
-        @for (o of orders(); track o.id ?? $index) {
+        @for (o of pagedOrders(); track o.id ?? $index) {
           <tr>
             <td class="mono">{{ o.id }}</td>
             <td class="mono">
@@ -99,6 +108,19 @@
             <td>{{ o.complateOrder ? 'Yes' : 'No' }}</td>
             <td>{{ o.cancel ? 'Yes' : 'No' }}</td>
             <td>{{ o.paid ? 'Yes' : 'No' }}</td>
+            <td>
+              @if (o.paid) {
+                @if (readOrderPaidByQrScan(o)) {
+                  <span class="pay-kind pay-kind-qr">QR</span>
+                } @else if (readOrderPaidByCredit(o)) {
+                  <span class="pay-kind pay-kind-credit">Credit</span>
+                } @else {
+                  <span class="pay-kind pay-kind-cash">Cash</span>
+                }
+              } @else {
+                —
+              }
+            </td>
             <td class="mono" title="paidPrice from API (cash received)">
               @if (amountReceived(o); as rec) {
                 {{ rec | number: '1.2-2' }}
@@ -124,6 +146,15 @@
                     >
                       {{ payingId() === o.id ? 'Paying…' : 'Pay' }}
                     </button>
+                    <button
+                      type="button"
+                      class="customer-display-inline-btn"
+                      title="Total + PromptPay for the customer (new tab)"
+                      [disabled]="o.id == null"
+                      (click)="openCustomerDisplayPage(o.id)"
+                    >
+                      Customer screen
+                    </button>
                     @if (o.lines.length > 0) {
                       <button
                         type="button"
@@ -145,7 +176,7 @@
           </tr>
           @if (expandedOrderId() === o.id) {
             <tr class="line-details-row">
-              <td colspan="12">
+              <td colspan="13">
                 <div class="line-details">
                   <div class="line-details-header">
                     <div class="line-details-title">Order lines</div>
@@ -246,13 +277,56 @@
         } @empty {
           @if (!loading()) {
             <tr>
-              <td class="empty" colspan="12">No orders found.</td>
+              <td class="empty" colspan="13">
+                @if (orders().length === 0) {
+                  No orders found.
+                } @else if (showOnlyNotDone()) {
+                  No orders with Done = No (everything is marked Done for this search).
+                } @else {
+                  No orders on this page.
+                }
+              </td>
             </tr>
           }
         }
       </tbody>
     </table>
   </div>
+
+  @if (totalOrders() > 0) {
+    <div class="pager" role="navigation" aria-label="Pagination">
+      <span class="pager-summary">{{ pagerRangeLabel() }}</span>
+      <span class="pager-meta">
+        Page <span class="mono">{{ pageIndex() + 1 }}</span> / <span class="mono">{{ pageCount() }}</span>
+      </span>
+      <label class="pager-size">
+        Rows per page
+        <select [value]="pageSize()" (change)="setPageSize(+$any($event.target).value)">
+          @for (sz of pageSizeOptions; track sz) {
+            <option [value]="sz">{{ sz }}</option>
+          }
+        </select>
+      </label>
+      <div class="pager-btns">
+        <button
+          type="button"
+          class="pager-btn"
+          [disabled]="pageIndex() <= 0"
+          (click)="goPrevPage()"
+        >
+          Previous
+        </button>
+        <button
+          type="button"
+          class="pager-btn"
+          [disabled]="pageIndex() >= pageCount() - 1"
+          (click)="goNextPage()"
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  }
 
   @if (payDialogOrder(); as po) {
     <div class="dialog-backdrop" (click)="closePayDialog()">
@@ -261,12 +335,41 @@
         <p class="dialog-order-no">
           Order: <span class="mono">{{ po.orderNo }}</span>
         </p>
+        <p class="pay-dialog-customer">
+          <button
+            type="button"
+            class="customer-display-btn"
+            [disabled]="payingId() === po.id"
+            (click)="openCustomerDisplayPage(po.id)"
+          >
+            Customer screen (new tab)
+          </button>
+        </p>
         <p class="pay-total">
           Total to pay (ignore canceled lines):
           <span class="mono">{{ payableTotal(po) | number: '1.2-2' }}</span>
         </p>
+        <app-promptpay-qr-display [amountBaht]="payableTotal(po)" />
+        <div class="pay-dialog-order-note">
+          <span class="pay-dialog-order-note-label">Order note</span>
+          @if (payDialogNoteError(); as ne) {
+            <p class="pay-dialog-note-error" role="alert">{{ ne }}</p>
+          }
+          <textarea
+            id="pay-dialog-order-note-input"
+            class="pay-dialog-order-note-input"
+            rows="2"
+            maxlength="2000"
+            spellcheck="false"
+            autocomplete="off"
+            [readonly]="payingId() === po.id"
+            [ngModel]="payDialogNoteDraft()"
+            (ngModelChange)="payDialogNoteDraft.set($event)"
+          ></textarea>
+        </div>
         <label class="pay-input-label" for="pay-input-amount">Input total to pay</label>
         <input
+          #payAmountInput
           id="pay-input-amount"
           type="number"
           min="0"
@@ -283,7 +386,10 @@
           <p class="pay-change">
             Change: <span class="mono">{{ change | number: '1.2-2' }}</span>
           </p>
-          <p class="pay-qr-gate">Paid by QR is off while there is cash change — set the amount to the <strong>exact</strong> total to use QR.</p>
+          <p class="pay-qr-gate">
+            Paid by QR or credit is off while there is cash change — set the amount to the
+            <strong>exact</strong> total to use those methods.
+          </p>
         }
         <div class="dialog-actions">
           <button
@@ -297,11 +403,20 @@
           <button
             type="button"
             class="pay-btn pay-btn-qr"
-            title="Requires exact total (no change); QR settles the amount due."
+            title="Requires exact total (no change); PromptPay / bank QR settles the amount due."
             [disabled]="payQrSettlementDisabled(po)"
             (click)="confirmPayQrFromDialog()"
           >
             {{ payingId() === po.id ? 'Paying…' : 'Paid by QR' }}
+          </button>
+          <button
+            type="button"
+            class="pay-btn pay-btn-credit"
+            title="Requires exact total (no change); records settlement as card/credit."
+            [disabled]="payQrSettlementDisabled(po)"
+            (click)="confirmPayCreditFromDialog()"
+          >
+            {{ payingId() === po.id ? 'Paying…' : 'Credit' }}
           </button>
           <button type="button" class="dialog-cancel-btn" (click)="closePayDialog()">Close</button>
         </div>

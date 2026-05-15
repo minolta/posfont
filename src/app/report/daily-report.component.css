@@ -184,6 +184,11 @@ h1 {
   background: #f0fdfa;
 }
 
+.tile-credit {
+  border-color: #c4b5fd;
+  background: #faf5ff;
+}
+
 .tile-label {
   display: block;
   font-size: 0.72rem;
@@ -269,6 +274,12 @@ tr:last-child td {
   color: #0f766e;
   background: #ccfbf1;
   border: 1px solid #5eead4;
+}
+
+.pay-kind-credit {
+  color: #5b21b6;
+  background: #ede9fe;
+  border: 1px solid #c4b5fd;
 }
 
 .pay-kind-cash {

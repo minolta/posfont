@@ -36,8 +36,17 @@ export interface PosOrder {
   change?: number | null;
   /** True when settled via scanned payment QR (`paid_by_qr_scan`). */
   paidByQrScan?: boolean | null;
+  /** True when settled by card / credit (`paid_by_credit`). */
+  paidByCredit?: boolean | null;
   /** Optional scanned payment reference (`qr_scan_payload`), e.g. PromptPay slip. */
   qrScanPayload?: string | null;
+  /**
+   * Whole-order note (e.g. table request, allergy). API may expose `note`, `order_note`, or `orderNote`;
+   * distinct from per-line {@link OrderLine.note}.
+   */
+  note?: string | null;
+  order_note?: string | null;
+  orderNote?: string | null;
   lines: OrderLine[];
   version: number;
 }
@@ -48,6 +57,8 @@ export interface PayOrderRequest {
   change: number;
   /** When true (or when `qrScanPayload` is non-empty), API records QR-settled payment. */
   paidByQrScan?: boolean;
+  /** When true, API records card/credit settlement (`paid_by_credit`). */
+  paidByCredit?: boolean;
   /** Raw string from the scanned QR; optional but recommended for audit. */
   qrScanPayload?: string | null;
 }
@@ -59,6 +70,12 @@ export interface OrderLineRequest {
   status?: OrderLineStatus;
   /** Kitchen / prep text; sent as `note`, `kitchen_note`, `kitchenNote`, etc. in JSON (see `orderLineRequestToWire`). */
   note?: string | null;
+}
+
+/** Body for `PATCH /api/orders/{id}/note` — version must match the order row. */
+export interface PatchOrderNoteRequest {
+  note: string;
+  version: number;
 }
 
 /** Matches `me.pixka.pos.order.api.OrderRequest`. */
@@ -75,4 +92,6 @@ export interface OrderRequest {
   /** Present after payment; include on PUT so the server does not clear persisted values. */
   paidPrice?: number | null;
   change?: number | null;
+  /** Whole-order note; max length enforced on server (e.g. 2000). Omitted or empty clears when updating. */
+  note?: string | null;
 }

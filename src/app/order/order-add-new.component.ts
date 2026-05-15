@@ -74,6 +74,7 @@ export class OrderAddNewComponent {
     complateOrderDate: [''],
     cancel: [false],
     version: [0, [Validators.required, Validators.min(0)]],
+    orderNote: ['', [Validators.maxLength(2000)]],
     lines: this.fb.array([this.newLineGroup()]),
   });
 
@@ -128,8 +129,12 @@ export class OrderAddNewComponent {
   linePickerQueryParams(): Record<string, string | null> {
     const raw = this.form.getRawValue();
     const tableId = Number(raw.tableId || raw.manualTableId || '');
+    const idOk = Number.isFinite(tableId) && tableId > 0;
+    const picked = idOk ? this.tables().find((t) => t.id === tableId) : undefined;
+    const code = (picked?.code ?? '').trim();
     return {
-      tableId: Number.isFinite(tableId) && tableId > 0 ? String(tableId) : null,
+      tableId: idOk ? String(tableId) : null,
+      tableCode: idOk && code ? code : null,
     };
   }
 
@@ -237,6 +242,7 @@ export class OrderAddNewComponent {
         ...(note !== undefined ? { note } : {}),
       };
     });
+    const orderNote = (v.orderNote ?? '').toString().trim().slice(0, 2000);
     const body: OrderRequest = {
       tableId,
       orderDate: normalizeLocalDateTimeForApi((v.orderDate ?? '').toString()),
@@ -246,6 +252,7 @@ export class OrderAddNewComponent {
       cancel: !!v.cancel,
       lines,
       version: Number(v.version),
+      ...(orderNote.length > 0 ? { note: orderNote } : {}),
     };
     this.submitting.set(true);
     this.orderService
@@ -271,8 +278,8 @@ export class OrderAddNewComponent {
             return;
           }
           sessionStorage.removeItem(OrderAddNewComponent.DRAFT_KEY);
-          void this.router.navigate(['/orders'], {
-            queryParams: { created: created.id },
+          void this.router.navigate(['/tables'], {
+            queryParams: { newOrder: created.id },
           });
         },
         error: (err: unknown) => {
@@ -332,6 +339,7 @@ export class OrderAddNewComponent {
       complateOrderDate: String(raw.complateOrderDate ?? ''),
       cancel: !!raw.cancel,
       version: Number(raw.version ?? 0),
+      orderNote: String(raw.orderNote ?? ''),
       lines,
     };
     sessionStorage.setItem(OrderAddNewComponent.DRAFT_KEY, JSON.stringify(draft));
@@ -370,6 +378,7 @@ export class OrderAddNewComponent {
         complateOrderDate?: string;
         cancel?: boolean;
         version?: number;
+        orderNote?: string;
         lines?: Array<{ foodId?: string; manualFoodId?: string; quantity?: number; note?: string }>;
       };
       this.form.patchValue({
@@ -380,6 +389,7 @@ export class OrderAddNewComponent {
         complateOrderDate: d.complateOrderDate ?? '',
         cancel: !!d.cancel,
         version: Number(d.version ?? 0),
+        orderNote: d.orderNote ?? '',
       });
       while (this.lines.length > 0) {
         this.lines.removeAt(0);

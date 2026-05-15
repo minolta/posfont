@@ -28,6 +28,8 @@ export class OrderLinePickerComponent {
   readonly selectedCategoryKey = signal('ALL');
   readonly tableId = this.route.snapshot.queryParamMap.get('tableId');
   readonly from = this.route.snapshot.queryParamMap.get('from');
+  readonly tableCodeParam =
+    this.route.snapshot.queryParamMap.get('tableCode')?.trim() ?? '';
   readonly addToOrderId = Number(this.route.snapshot.queryParamMap.get('addToOrderId') ?? '');
   readonly foodPickerLabel = foodPickerLabel;
   readonly notice = signal<string | null>(null);
@@ -117,9 +119,7 @@ export class OrderLinePickerComponent {
       return;
     }
     void this.router.navigate(['/orders/new'], {
-      queryParams: {
-        tableId: this.tableId,
-      },
+      queryParams: this.newOrderContinueParams(),
     });
   }
 
@@ -140,9 +140,7 @@ export class OrderLinePickerComponent {
       return;
     }
     void this.router.navigate(['/orders/new'], {
-      queryParams: {
-        tableId: this.tableId,
-      },
+      queryParams: this.newOrderContinueParams(),
     });
   }
 
@@ -171,6 +169,19 @@ export class OrderLinePickerComponent {
 
   pictureSrc(food: Food): string | null {
     return this.foodService.resolvePictureSrc(food);
+  }
+
+  /** Preserve `tableId` and `tableCode` when continuing to order details (e.g. from table QR). */
+  private newOrderContinueParams(): Record<string, string> {
+    const q: Record<string, string> = {};
+    const tid = this.tableId?.trim();
+    if (tid) {
+      q['tableId'] = tid;
+    }
+    if (this.tableCodeParam) {
+      q['tableCode'] = this.tableCodeParam;
+    }
+    return q;
   }
 
   private searchableText(food: Food): string {

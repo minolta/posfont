@@ -1,7 +1,19 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import {
+  afterNextRender,
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  ElementRef,
+  inject,
+  Injector,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
   catchError,
@@ -10,6 +22,7 @@ import {
   map,
   of,
   switchMap,
+  throwError,
   timer,
 } from 'rxjs';
 
@@ -22,15 +35,26 @@ import {
   orderRequestCompleteAllExceptCanceled,
   resolvedLineStatus,
 } from './order-line-status.util';
-import { buildPayOrderRequest, mergeOrderRequestPaymentFromPosOrder, mergePayOrderAmounts, readPosOrderPaidPrice } from './order-pay.util';
+import {
+  buildPayOrderRequest,
+  mergeOrderRequestPaymentFromPosOrder,
+  mergePayOrderAmounts,
+  readOrderPaidByCredit,
+  readOrderPaidByQrScan,
+  readPosOrderNote,
+  readPosOrderPaidPrice,
+} from './order-pay.util';
+import { CustomerDisplaySessionService, CUSTOMER_DISPLAY_WINDOW_NAME } from './customer-display-session.service';
+import { pingOrderCustomerDisplayRefresh } from './order-customer-display-sync';
 import { lineKitchenNote, orderLineRequestNotePart } from './order-line-note.util';
 import type { OrderLine, OrderLineStatus, OrderRequest, PayOrderRequest, PosOrder } from './order.model';
 import { OrderService } from './order.service';
+import { PromptPayQrDisplayComponent } from '../payment/promptpay-qr-display.component';
 
 @Component({
   selector: 'app-order-list',
   standalone: true,
-  imports: [DatePipe, DecimalPipe, RouterLink],
+  imports: [DatePipe, DecimalPipe, FormsModule, RouterLink, PromptPayQrDisplayComponent],
   templateUrl: './order-list.component.html',
   styleUrl: './order-list.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -38,12 +62,19 @@ import { OrderService } from './order.service';
 export class OrderListComponent {
   /** Template: show per-line kitchen note when present. */
   readonly lineKitchenNote = lineKitchenNote;
+  /** Template: payment method pills (match daily report). */
+  readonly readOrderPaidByQrScan = readOrderPaidByQrScan;
+  readonly readOrderPaidByCredit = readOrderPaidByCredit;
 
   private static readonly PICKED_EXISTING_ORDER_LINES_KEY = 'order-list-add-picked-lines-v1';
   private readonly orderService = inject(OrderService);
   private readonly foodService = inject(FoodService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly customerDisplaySession = inject(CustomerDisplaySessionService);
+  private readonly injector = inject(Injector);
+  /** Focus target when Settle payment opens. */
+  private readonly payAmountInputRef = viewChild<ElementRef<HTMLInputElement>>('payAmountInput');
 
   readonly createdId = toSignal(
     this.route.queryParamMap.pipe(map((p) => p.get('created'))),
@@ -64,6 +95,10 @@ export class OrderListComponent {
   readonly payingId = signal<number | null>(null);
   readonly payError = signal<string | null>(null);
   readonly payDialogOrderId = signal<number | null>(null);
+  /** Fresh `GET /orders/{id}` while Settle payment is open — includes whole-order `note` when list does not. */
+  readonly payDialogOrderDetail = signal<PosOrder | null>(null);
+  readonly payDialogNoteDraft = signal('');
+  readonly payDialogNoteError = signal<string | null>(null);
   readonly payInputAmount = signal<string>('');
   readonly addingLineId = signal<number | null>(null);
   readonly addLineError = signal<string | null>(null);
@@ -75,6 +110,12 @@ export class OrderListComponent {
   readonly addFoodSearchByOrderId = signal<Record<number, string>>({});
   readonly expandedOrderId = signal<number | null>(null);
 
+  readonly pageSize = signal(20);
+  readonly pageIndex = signal(0);
+  readonly pageSizeOptions = [10, 20, 50] as const;
+  /** When true, only orders where Done = No (`complateOrder` false). */
+  readonly showOnlyNotDone = signal(false);
+
   readonly foods = toSignal(
     this.foodService.getFoods().pipe(
       map((foods) =>
@@ -85,7 +126,88 @@ export class OrderListComponent {
     { initialValue: [] as Food[] },
   );
 
+  readonly orders = toSignal(
+    combineLatest([toObservable(this.searchTerm), toObservable(this.refreshNonce)]).pipe(
+      switchMap(([q]) => {
+        this.loading.set(true);
+        this.error.set(null);
+        const trimmed = q.trim();
+        return timer(trimmed ? 300 : 0).pipe(
+          switchMap(() =>
+            this.orderService.searchOrders(trimmed || undefined).pipe(
+              catchError(() => {
+                this.error.set('Could not load orders. Check that the API is running.');
+                return of([] as PosOrder[]);
+              }),
+              finalize(() => this.loading.set(false)),
+            ),
+          ),
+        );
+      }),
+    ),
+    { initialValue: [] as PosOrder[] },
+  );
+
+  /** Search results optionally filtered by “not done” (order-level Done flag). */
+  readonly visibleOrders = computed(() => {
+    const all = this.orders();
+    if (!this.showOnlyNotDone()) {
+      return all;
+    }
+    return all.filter((o) => !o.complateOrder);
+  });
+
+  readonly totalOrders = computed(() => this.visibleOrders().length);
+
+  readonly pageCount = computed(() => {
+    const n = this.totalOrders();
+    const s = Math.max(1, this.pageSize());
+    return Math.max(1, Math.ceil(n / s));
+  });
+
+  readonly pagedOrders = computed(() => {
+    const all = this.visibleOrders();
+    const s = Math.max(1, this.pageSize());
+    const start = this.pageIndex() * s;
+    return all.slice(start, start + s);
+  });
+
+  readonly pagerRangeLabel = computed(() => {
+    const total = this.totalOrders();
+    if (total === 0) {
+      return 'No orders';
+    }
+    const s = Math.max(1, this.pageSize());
+    const i = this.pageIndex();
+    const from = i * s + 1;
+    const to = Math.min(total, (i + 1) * s);
+    return `${from}–${to} of ${total}`;
+  });
+
   constructor() {
+    effect(() => {
+      const total = this.orders().length;
+      const size = Math.max(1, this.pageSize());
+      const maxIdx = Math.max(0, Math.ceil(total / size) - 1);
+      if (this.pageIndex() > maxIdx) {
+        this.pageIndex.set(maxIdx);
+      }
+    });
+
+    effect(() => {
+      if (this.payDialogOrderId() == null) {
+        return;
+      }
+      afterNextRender(
+        () => {
+          const el = this.payAmountInputRef()?.nativeElement;
+          el?.focus();
+          el?.select();
+        },
+        { injector: this.injector },
+      );
+    });
+
     combineLatest([this.route.queryParamMap, toObservable(this.orders)]).subscribe(([qpm, orders]) => {
       const openPayId = Number(qpm.get('openPayId') ?? '');
       if (Number.isFinite(openPayId) && openPayId > 0) {
@@ -144,30 +266,36 @@ export class OrderListComponent {
     });
   }
 
-  readonly orders = toSignal(
-    combineLatest([toObservable(this.searchTerm), toObservable(this.refreshNonce)]).pipe(
-      switchMap(([q]) => {
-        this.loading.set(true);
-        this.error.set(null);
-        const trimmed = q.trim();
-        return timer(trimmed ? 300 : 0).pipe(
-          switchMap(() =>
-            this.orderService.searchOrders(trimmed || undefined).pipe(
-              catchError(() => {
-                this.error.set('Could not load orders. Check that the API is running.');
-                return of([] as PosOrder[]);
-              }),
-              finalize(() => this.loading.set(false)),
-            ),
-          ),
-        );
-      }),
-    ),
-    { initialValue: [] as PosOrder[] },
-  );
-
   onSearchInput(value: string): void {
     this.searchTerm.set(value);
+    this.pageIndex.set(0);
+    this.expandedOrderId.set(null);
+  }
+
+  setPageSize(size: number): void {
+    if (![10, 20, 50].includes(size)) {
+      return;
+    }
+    this.pageSize.set(size);
+    this.pageIndex.set(0);
+    this.expandedOrderId.set(null);
+  }
+
+  goPrevPage(): void {
+    this.pageIndex.update((p) => Math.max(0, p - 1));
+    this.expandedOrderId.set(null);
+  }
+
+  goNextPage(): void {
+    const last = this.pageCount() - 1;
+    this.pageIndex.update((p) => Math.min(last, p + 1));
+    this.expandedOrderId.set(null);
+  }
+
+  onShowOnlyNotDone(checked: boolean): void {
+    this.showOnlyNotDone.set(checked);
+    this.pageIndex.set(0);
+    this.expandedOrderId.set(null);
   }
 
   deleteOrder(o: PosOrder): void {
@@ -185,7 +313,12 @@ export class OrderListComponent {
       .subscribe({
         next: () => this.refreshNonce.update((n) => n + 1),
         error: (err: unknown) => {
-          this.deleteError.set(this.extractErrorMessage(err));
+          this.deleteError.set(
+            this.extractErrorMessage(
+              err,
+              'Could not delete order. Check API connectivity and dependencies.',
+            ),
+          );
         },
       });
   }
@@ -196,11 +329,43 @@ export class OrderListComponent {
     }
     this.payError.set(null);
     this.payInputAmount.set(this.payableTotal(o).toFixed(2));
+    this.payDialogOrderDetail.set(null);
+    this.payDialogNoteDraft.set(readPosOrderNote(o) ?? '');
+    this.payDialogNoteError.set(null);
     this.payDialogOrderId.set(o.id);
+    this.refreshPayDialogOrderFromApi(o.id);
+    this.customerDisplaySession.focusOrder(o.id);
+  }
+
+  private refreshPayDialogOrderFromApi(orderId: number): void {
+    this.orderService.getOrderById(orderId).subscribe({
+      next: (full) => {
+        if (this.payDialogOrderId() === orderId && full) {
+          this.payDialogOrderDetail.set(full);
+          this.payDialogNoteDraft.set(readPosOrderNote(full) ?? '');
+        }
+      },
+      error: () => {
+        /* list row still drives the dialog */
+      },
+    });
+  }
+
+  /** Opens kiosk / tablet customer-facing total + PromptPay QR in a new browser tab. */
+  openCustomerDisplayPage(orderId: number | null | undefined): void {
+    if (orderId == null) {
+      return;
+    }
+    this.customerDisplaySession.focusOrder(orderId);
+    const url = this.router.serializeUrl(this.router.createUrlTree(['/orders', 'display']));
+    window.open(url, CUSTOMER_DISPLAY_WINDOW_NAME);
   }
 
   closePayDialog(): void {
     this.payDialogOrderId.set(null);
+    this.payDialogOrderDetail.set(null);
+    this.payDialogNoteDraft.set('');
+    this.payDialogNoteError.set(null);
     this.payInputAmount.set('');
   }
 
@@ -208,6 +373,10 @@ export class OrderListComponent {
     const id = this.payDialogOrderId();
     if (id == null) {
       return undefined;
+    }
+    const detail = this.payDialogOrderDetail();
+    if (detail != null && detail.id === id) {
+      return detail;
     }
     return this.orders().find((o) => o.id === id);
   }
@@ -247,6 +416,26 @@ export class OrderListComponent {
     this.submitPaymentFromDialog(order, { ...rawPay, paidByQrScan: true });
   }
 
+  /** Card/credit: exact total, no change (same gate as QR). */
+  confirmPayCreditFromDialog(): void {
+    const order = this.payDialogOrder();
+    if (!order || order.id == null) {
+      this.closePayDialog();
+      return;
+    }
+    if (this.payQrSettlementDisabled(order)) {
+      this.payError.set('Paid by credit needs the entered amount to equal the total (no change).');
+      return;
+    }
+    const due = this.payableTotal(order);
+    const rawPay = buildPayOrderRequest(due, due);
+    if ('error' in rawPay) {
+      this.payError.set(rawPay.error);
+      return;
+    }
+    this.submitPaymentFromDialog(order, { ...rawPay, paidByCredit: true });
+  }
+
   /** Used to disable Paid by QR: exact amount only (no cash change scenario). */
   payQrSettlementDisabled(order: PosOrder): boolean {
     const id = order.id ?? 0;
@@ -279,30 +468,43 @@ export class OrderListComponent {
       return;
     }
     const id = order.id;
-    const baseBody = orderRequestCompleteAllExceptCanceled(order);
-    if (baseBody == null) {
-      this.payError.set('Order has no table reference and cannot be updated.');
-      return;
-    }
-    const prepBody = mergePayOrderAmounts(baseBody, payBody);
+    /** Whole-order note from the dialog — saved on the same PUT as payment (no separate PATCH). */
+    const draft = this.payDialogNoteDraft().trim().slice(0, 2000);
+
     this.payingId.set(id);
     this.payError.set(null);
+    this.payDialogNoteError.set(null);
+
     this.orderService
-      .updateOrder(id, prepBody)
+      .getOrderRowById(id)
       .pipe(
-        switchMap(() => this.orderService.payOrder(id, payBody)),
+        switchMap((fresh) => {
+          const baseBody = orderRequestCompleteAllExceptCanceled(fresh);
+          if (baseBody == null) {
+            return throwError(
+              () => new Error('Order has no table reference and cannot be updated.'),
+            );
+          }
+          const prepBody = mergePayOrderAmounts({ ...baseBody, note: draft }, payBody);
+          return this.orderService.updateOrder(id, prepBody).pipe(
+            switchMap(() => this.orderService.payOrder(id, payBody)),
+          );
+        }),
         finalize(() => this.payingId.set(null)),
       )
       .subscribe({
         next: () => {
+          this.customerDisplaySession.focusOrder(id);
           this.closePayDialog();
           this.refreshNonce.update((n) => n + 1);
         },
         error: (err: unknown) => {
-          this.payError.set(
-            this.httpErrorDetail(err) ||
-              'Could not record payment (line update failed, already paid, or the API is unreachable).',
+          const message = this.extractErrorMessage(
+            err,
+            'Could not record payment (check amount, note, or API).',
           );
+          this.payError.set(message);
+          this.payDialogNoteError.set(message);
         },
       });
   }
@@ -443,9 +645,17 @@ export class OrderListComponent {
       .updateOrder(o.id, body)
       .pipe(finalize(() => this.completeAllOrderId.set(null)))
       .subscribe({
-        next: () => this.refreshNonce.update((n) => n + 1),
+        next: () => {
+          const id = o.id;
+          if (id != null) {
+            pingOrderCustomerDisplayRefresh(id);
+          }
+          this.refreshNonce.update((n) => n + 1);
+        },
         error: (err: unknown) => {
-          this.statusError.set(this.extractErrorMessage(err));
+          this.statusError.set(
+            this.extractErrorMessage(err, 'Could not update line status. Check API connectivity.'),
+          );
         },
       });
   }
@@ -490,9 +700,17 @@ export class OrderListComponent {
       .updateOrder(o.id, body)
       .pipe(finalize(() => this.statusUpdatingKey.set(null)))
       .subscribe({
-        next: () => this.refreshNonce.update((n) => n + 1),
+        next: () => {
+          const oid = o.id;
+          if (oid != null) {
+            pingOrderCustomerDisplayRefresh(oid);
+          }
+          this.refreshNonce.update((n) => n + 1);
+        },
         error: (err: unknown) => {
-          this.statusError.set(this.extractErrorMessage(err));
+          this.statusError.set(
+            this.extractErrorMessage(err, 'Could not update line status. Check API connectivity.'),
+          );
         },
       });
   }
@@ -573,11 +791,15 @@ export class OrderListComponent {
     return 'WAIT';
   }
 
-  private extractErrorMessage(err: unknown): string {
-    return (
-      this.httpErrorDetail(err) ||
-      'Could not delete order. Check API connectivity and dependencies.'
-    );
+  private extractErrorMessage(err: unknown, fallback: string): string {
+    const d = this.httpErrorDetail(err);
+    if (d) {
+      return d;
+    }
+    if (err instanceof Error && err.message.trim().length > 0) {
+      return err.message;
+    }
+    return fallback;
   }
 
   private httpErrorDetail(err: unknown): string {
@@ -591,6 +813,9 @@ export class OrderListComponent {
       }
       if (typeof err.error === 'string' && err.error.trim().length > 0) {
         return err.error;
+      }
+      if (err.status >= 400) {
+        return `Request failed (HTTP ${err.status})`;
       }
     }
     return '';
@@ -630,13 +855,16 @@ export class OrderListComponent {
       .pipe(finalize(() => this.addingLineId.set(null)))
       .subscribe({
         next: () => {
+          pingOrderCustomerDisplayRefresh(orderId);
           this.refreshNonce.update((n) => n + 1);
           this.addFoodByOrderId.update((prev) => ({ ...prev, [orderId]: '' }));
           this.addQtyByOrderId.update((prev) => ({ ...prev, [orderId]: '1' }));
           this.addFoodSearchByOrderId.update((prev) => ({ ...prev, [orderId]: '' }));
         },
         error: (err: unknown) => {
-          this.addLineError.set(this.extractErrorMessage(err));
+          this.addLineError.set(
+            this.extractErrorMessage(err, 'Could not add line. Check API connectivity.'),
+          );
         },
       });
   }
@@ -688,10 +916,13 @@ export class OrderListComponent {
       .subscribe({
         next: () => {
           sessionStorage.removeItem(OrderListComponent.PICKED_EXISTING_ORDER_LINES_KEY);
+          pingOrderCustomerDisplayRefresh(orderId);
           this.refreshNonce.update((n) => n + 1);
         },
         error: (err: unknown) => {
-          this.addLineError.set(this.extractErrorMessage(err));
+          this.addLineError.set(
+            this.extractErrorMessage(err, 'Could not add line. Check API connectivity.'),
+          );
         },
       });
   }

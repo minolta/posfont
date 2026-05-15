@@ -5,7 +5,7 @@ import { Observable, catchError, map, throwError } from 'rxjs';
 import { POS_API_BASE_URL } from '../api/pos-api-base-url.token';
 import { resolvedLineStatus } from '../order/order-line-status.util';
 import type { PosOrder } from '../order/order.model';
-import { readOrderPaidByQrScan, readPosOrderChange, readPosOrderPaidPrice } from '../order/order-pay.util';
+import { readOrderPaidByCredit, readOrderPaidByQrScan, readPosOrderChange, readPosOrderPaidPrice } from '../order/order-pay.util';
 import { OrderService } from '../order/order.service';
 
 import type { DailyReport, DailyReportApiDto, DailyReportFoodTableRow, DailyReportTableRow } from './report.model';
@@ -101,6 +101,9 @@ function normalizeApiRow(raw: unknown): DailyReportTableRow {
   const qrRaw = row['paidByQrScan'] ?? row['paid_by_qr_scan'];
   const paidByQrScan =
     qrRaw === true || qrRaw === 'true' || qrRaw === 1 || qrRaw === '1';
+  const creditRaw = row['paidByCredit'] ?? row['paid_by_credit'];
+  const paidByCredit =
+    creditRaw === true || creditRaw === 'true' || creditRaw === 1 || creditRaw === '1';
   return {
     orderId,
     orderNo,
@@ -109,7 +112,19 @@ function normalizeApiRow(raw: unknown): DailyReportTableRow {
     paidPrice: pp != null && pp !== '' ? n(pp) : null,
     change: ch != null && ch !== '' ? n(ch) : null,
     paidByQrScan,
+    paidByCredit,
   };
+}
+
+/** Sum tendered via credit card (`paidPrice` when set, otherwise line due). */
+function totalReceivedByCreditFromRows(rows: DailyReportTableRow[]): number {
+  return rows.reduce((sum, r) => {
+    if (!r.paidByCredit) {
+      return sum;
+    }
+    const amt = r.paidPrice != null ? r.paidPrice : r.totalDue;
+    return sum + amt;
+  }, 0);
 }
 
 /** Sum tendered via QR (`paidPrice` when set, otherwise line due). */
@@ -123,20 +138,20 @@ function totalReceivedByQrScanFromRows(rows: DailyReportTableRow[]): number {
   }, 0);
 }
 
-/** Tendered amounts for cash-paid rows only (excludes QR). */
+/** Tendered amounts for cash-paid rows only (excludes QR and credit). */
 function totalCashReceivedFromRows(rows: DailyReportTableRow[]): number {
   return rows.reduce((sum, r) => {
-    if (r.paidByQrScan || r.paidPrice == null) {
+    if (r.paidByQrScan || r.paidByCredit || r.paidPrice == null) {
       return sum;
     }
     return sum + r.paidPrice;
   }, 0);
 }
 
-/** Change given back on cash-paid rows only. */
+/** Change given back on cash-paid rows only (QR and credit excluded). */
 function totalChangeCashOnlyFromRows(rows: DailyReportTableRow[]): number {
   return rows.reduce((sum, r) => {
-    if (r.paidByQrScan || r.change == null) {
+    if (r.paidByQrScan || r.paidByCredit || r.change == null) {
       return sum;
     }
     return sum + r.change;
@@ -155,6 +170,7 @@ function mapApiToDailyReport(raw: DailyReportApiDto, fallbackStart: string, fall
   const foods =
     foodsIn.length > 0 ? [...foodsIn].sort(compareFoodRowsByTotalThenQtyDesc) : [];
   const apiQrRaw = raw.totalReceivedByQrScan ?? raw.total_received_by_qr_scan;
+  const apiCreditRaw = raw.totalReceivedByCredit ?? raw.total_received_by_credit;
   let totalReceivedByQrScan = totalReceivedByQrScanFromRows(rows);
   if (
     rows.length === 0 &&
@@ -164,8 +180,24 @@ function mapApiToDailyReport(raw: DailyReportApiDto, fallbackStart: string, fall
   ) {
     totalReceivedByQrScan = n(apiQrRaw);
   }
+  let totalReceivedByCredit = totalReceivedByCreditFromRows(rows);
+  if (
+    rows.length === 0 &&
+    apiCreditRaw !== undefined &&
+    apiCreditRaw !== null &&
+    String(apiCreditRaw).trim() !== ''
+  ) {
+    totalReceivedByCredit = n(apiCreditRaw);
+  }
+  const paidByCreditOrderCount =
+    rows.length > 0
+      ? rows.reduce((c, row) => c + (row.paidByCredit ? 1 : 0), 0)
+      : n(raw.paidByCreditOrderCount ?? raw.paid_by_credit_order_count);
   const totalSalesNum = n(raw.totalSales ?? raw.total_sales);
-  const realCashSalesDueInShop = Math.max(0, totalSalesNum - totalReceivedByQrScan);
+  const realCashSalesDueInShop = Math.max(
+    0,
+    totalSalesNum - totalReceivedByQrScan - totalReceivedByCredit,
+  );
   let totalCashReceived = n(raw.totalCashReceived ?? raw.total_cash_received);
   let totalChange = n(raw.totalChange ?? raw.total_change);
   if (rows.length > 0) {
@@ -180,7 +212,9 @@ function mapApiToDailyReport(raw: DailyReportApiDto, fallbackStart: string, fall
     paidByQrScanOrderCount: n(
       raw.paidByQrScanOrderCount ?? raw.paid_by_qr_scan_order_count,
     ),
+    paidByCreditOrderCount,
     totalReceivedByQrScan,
+    totalReceivedByCredit,
     realCashSalesDueInShop,
     totalSales: totalSalesNum,
     totalCashReceived,
@@ -208,7 +242,9 @@ function aggregateOrdersClientSide(orders: PosOrder[], start: string, end: strin
 
   let paidOrderCount = 0;
   let paidByQrScanOrderCount = 0;
+  let paidByCreditOrderCount = 0;
   let totalReceivedByQrScan = 0;
+  let totalReceivedByCredit = 0;
   let totalSales = 0;
   let totalCashReceived = 0;
   let totalChange = 0;
@@ -229,15 +265,19 @@ function aggregateOrdersClientSide(orders: PosOrder[], start: string, end: strin
     }
     paidOrderCount += 1;
     const paidQr = readOrderPaidByQrScan(o);
+    const paidCredit = readOrderPaidByCredit(o);
     const due = payableTotal(o);
     const pp = readPosOrderPaidPrice(o);
     const ch = readPosOrderChange(o);
     if (paidQr) {
       paidByQrScanOrderCount += 1;
       totalReceivedByQrScan += pp != null ? pp : due;
+    } else if (paidCredit) {
+      paidByCreditOrderCount += 1;
+      totalReceivedByCredit += pp != null ? pp : due;
     }
     totalSales += due;
-    if (!paidQr) {
+    if (!paidQr && !paidCredit) {
       if (pp != null) {
         totalCashReceived += pp;
       }
@@ -253,6 +293,7 @@ function aggregateOrdersClientSide(orders: PosOrder[], start: string, end: strin
       paidPrice: pp,
       change: ch,
       paidByQrScan: paidQr,
+      paidByCredit: paidCredit,
     });
     for (const ln of o.lines ?? []) {
       if (resolvedLineStatus(ln, o) === 'CANCEL') {
@@ -282,7 +323,7 @@ function aggregateOrdersClientSide(orders: PosOrder[], start: string, end: strin
     compareFoodRowsByTotalThenQtyDesc,
   );
 
-  const realCashSalesDueInShop = Math.max(0, totalSales - totalReceivedByQrScan);
+  const realCashSalesDueInShop = Math.max(0, totalSales - totalReceivedByQrScan - totalReceivedByCredit);
 
   return {
     startDate: start,
@@ -290,7 +331,9 @@ function aggregateOrdersClientSide(orders: PosOrder[], start: string, end: strin
     orderCount: touchIds.size,
     paidOrderCount,
     paidByQrScanOrderCount,
+    paidByCreditOrderCount,
     totalReceivedByQrScan,
+    totalReceivedByCredit,
     realCashSalesDueInShop,
     totalSales,
     totalCashReceived,

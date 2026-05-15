@@ -4,8 +4,19 @@ import { catchError, map, Observable } from 'rxjs';
 
 import { POS_API_BASE_URL } from '../api/pos-api-base-url.token';
 
-import type { OrderRequest, PayOrderRequest, PosOrder } from './order.model';
-import { orderRequestToWireBody, payRequestToWireBody } from './order-pay.util';
+import type { OrderRequest, PatchOrderNoteRequest, PayOrderRequest, PosOrder } from './order.model';
+import {
+  orderRequestToWireBody,
+  patchOrderNoteToWire,
+  payRequestToWireBody,
+} from './order-pay.util';
+
+/** Newest numeric `id` first; missing ids sort last. */
+function sortOrdersByIdDesc(a: PosOrder, b: PosOrder): number {
+  const aid = Number.isFinite(a.id) ? a.id! : -Infinity;
+  const bid = Number.isFinite(b.id) ? b.id! : -Infinity;
+  return bid - aid;
+}
 
 @Injectable({ providedIn: 'root' })
 export class OrderService {
@@ -19,7 +30,9 @@ export class OrderService {
     if (trimmed) {
       params = params.set('q', trimmed);
     }
-    return this.http.get<PosOrder[]>(this.rootUrl, { params });
+    return this.http
+      .get<PosOrder[]>(this.rootUrl, { params })
+      .pipe(map((orders) => [...orders].sort(sortOrdersByIdDesc)));
   }
 
   getOrders(): Observable<PosOrder[]> {
@@ -36,12 +49,25 @@ export class OrderService {
     );
   }
 
+  /**
+   * Loads one order by id from `GET /api/orders/{id}` only (no list fallback).
+   * Use before PATCH note / optimistic locking so `version` matches the database row.
+   */
+  getOrderRowById(id: number): Observable<PosOrder> {
+    return this.http.get<PosOrder>(`${this.rootUrl}/${id}`);
+  }
+
   createOrder(request: OrderRequest): Observable<PosOrder> {
     return this.http.post<PosOrder>(this.rootUrl, orderRequestToWireBody(request));
   }
 
   updateOrder(id: number, request: OrderRequest): Observable<PosOrder> {
     return this.http.put<PosOrder>(`${this.rootUrl}/${id}`, orderRequestToWireBody(request));
+  }
+
+  /** `PATCH /api/orders/{id}/note` — update whole-order note (works on paid orders). */
+  patchOrderNote(id: number, body: PatchOrderNoteRequest): Observable<PosOrder> {
+    return this.http.patch<PosOrder>(`${this.rootUrl}/${id}/note`, patchOrderNoteToWire(body));
   }
 
   deleteOrder(id: number): Observable<void> {

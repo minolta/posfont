@@ -22,6 +22,21 @@ h1 {
   margin: 0.6rem 0 0.2rem;
 }
 
+.table-order-banner {
+  margin: 0.35rem 0 0.5rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 8px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1e40af;
+}
+
+.table-order-banner .mono {
+  font-weight: 700;
+}
+
 .hint {
   margin: 0 0 0.8rem;
   color: #6b7280;

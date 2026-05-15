@@ -28,6 +28,18 @@ export const routes: Routes = [
     component: OrderLinePickerComponent,
   },
   {
+    path: 'orders/display',
+    loadComponent: () =>
+      import('./order/order-customer-display.component').then((m) => m.OrderCustomerDisplayComponent),
+  },
+  {
+    path: 'orders/:id/display',
+    loadComponent: () =>
+      import('./order/customer-display-legacy-redirect.component').then(
+        (m) => m.CustomerDisplayLegacyRedirectComponent,
+      ),
+  },
+  {
     path: 'orders/:id/edit',
     loadComponent: () =>
       import('./order/order-edit.component').then((m) => m.OrderEditComponent),

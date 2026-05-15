@@ -3,6 +3,11 @@
     ← {{ isExistingOrderFlow() ? 'Back to orders' : 'Back to new order' }}
   </button>
   <h1>Pick food by picture</h1>
+  @if (tableCodeParam) {
+    <p class="table-order-banner">
+      Table <span class="mono">{{ tableCodeParam }}</span>
+    </p>
+  }
   <p class="hint">{{ pickerHint() }}</p>
   @if (notice(); as msg) {
     <p class="notice">{{ msg }}</p>

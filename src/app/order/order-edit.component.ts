@@ -6,11 +6,21 @@ import {
   FormArray,
   FormBuilder,
   FormGroup,
+  FormsModule,
   ReactiveFormsModule,
   Validators,
 } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { EMPTY, catchError, finalize, forkJoin, map, of, switchMap } from 'rxjs';
+import {
+  EMPTY,
+  catchError,
+  finalize,
+  forkJoin,
+  map,
+  of,
+  switchMap,
+  throwError,
+} from 'rxjs';
 
 import type { Food } from '../food/food.model';
 import { FoodService } from '../food/food.service';
@@ -22,13 +32,14 @@ import {
   normalizeLocalDateTimeForApi,
 } from './order-datetime.util';
 import { mergeFoodsFromApis, mergeTablesFromApis, foodPickerLabel, tablePickerLabel } from './order-merge.util';
-import type { OrderLine, OrderLineStatus, OrderRequest, PosOrder } from './order.model';
+import type { OrderLine, OrderLineStatus, OrderRequest, PatchOrderNoteRequest, PosOrder } from './order.model';
 import { lineKitchenNote, trimNewLineNote } from './order-line-note.util';
 import { resolvedLineStatus } from './order-line-status.util';
 import {
   mergeOrderRequestPaymentFromPosOrder,
-  readOrderPaidByQrScan,
+  orderPaymentMethodLabel,
   readPosOrderChange,
+  readPosOrderNote,
   readPosOrderPaidPrice,
 } from './order-pay.util';
 import { OrderService } from './order.service';
@@ -36,7 +47,7 @@ import { OrderService } from './order.service';
 @Component({
   selector: 'app-order-edit',
   standalone: true,
-  imports: [DecimalPipe, ReactiveFormsModule, RouterLink],
+  imports: [DecimalPipe, FormsModule, ReactiveFormsModule, RouterLink],
   templateUrl: './order-edit.component.html',
   styleUrl: './order-edit.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -57,6 +68,10 @@ export class OrderEditComponent {
   readonly orderId = signal<number | null>(null);
   readonly orderPaid = signal(false);
   readonly paidView = signal<PosOrder | null>(null);
+  /** Draft for whole-order note on paid orders (PATCH /note). */
+  readonly paidNoteDraft = signal('');
+  readonly paidNoteSaving = signal(false);
+  readonly paidNoteError = signal<string | null>(null);
   /** Snapshot from GET; used to re-send `paidPrice` / `change` on PUT when present. */
   private readonly loadedOrder = signal<PosOrder | null>(null);
   readonly tableSearch = signal('');
@@ -74,6 +89,7 @@ export class OrderEditComponent {
     complateOrderDate: [''],
     cancel: [false],
     version: [0, [Validators.required, Validators.min(0)]],
+    orderNote: ['', [Validators.maxLength(2000)]],
     lines: this.fb.array([this.newLineGroup()]),
   });
 
@@ -116,6 +132,8 @@ export class OrderEditComponent {
             this.orderPaid.set(false);
             this.paidView.set(null);
             this.loadedOrder.set(null);
+            this.paidNoteDraft.set('');
+            this.paidNoteError.set(null);
             return EMPTY;
           }
           this.orderId.set(id);
@@ -154,6 +172,8 @@ export class OrderEditComponent {
           this.orderPaid.set(false);
           this.paidView.set(null);
           this.loadedOrder.set(null);
+          this.paidNoteDraft.set('');
+          this.paidNoteError.set(null);
           return;
         }
         this.loadError.set(null);
@@ -161,10 +181,14 @@ export class OrderEditComponent {
         if (order.paid) {
           this.orderPaid.set(true);
           this.paidView.set(order);
+          this.paidNoteDraft.set(readPosOrderNote(order) ?? '');
+          this.paidNoteError.set(null);
           return;
         }
         this.orderPaid.set(false);
         this.paidView.set(null);
+        this.paidNoteDraft.set('');
+        this.paidNoteError.set(null);
         while (this.lines.length > 0) {
           this.lines.removeAt(0);
         }
@@ -194,6 +218,7 @@ export class OrderEditComponent {
             : '',
           cancel: order.cancel,
           version: order.version,
+          orderNote: readPosOrderNote(order) ?? '',
         });
       });
   }
@@ -244,9 +269,9 @@ export class OrderEditComponent {
     return readPosOrderPaidPrice(o);
   }
 
-  /** How the order was settled when paid (cash vs QR scan). */
+  /** How the order was settled when paid (cash, QR, or credit). */
   paidSettlementLabel(o: PosOrder): string {
-    return readOrderPaidByQrScan(o) ? 'QR scan' : 'Cash';
+    return orderPaymentMethodLabel(o);
   }
 
   /** Stored change from API, or paid price minus line total when paid price is known. */
@@ -315,7 +340,8 @@ export class OrderEditComponent {
     if (
       f.controls.orderNo.invalid ||
       f.controls.orderDate.invalid ||
-      f.controls.version.invalid
+      f.controls.version.invalid ||
+      f.controls.orderNote.invalid
     ) {
       return false;
     }
@@ -381,6 +407,7 @@ export class OrderEditComponent {
         cancel: !!v.cancel,
         lines,
         version: Number(v.version),
+        note: (v.orderNote ?? '').trim().slice(0, 2000),
       },
       loaded,
     );
@@ -400,6 +427,42 @@ export class OrderEditComponent {
       });
   }
 
+  savePaidOrderNote(): void {
+    const id = this.orderId();
+    const vo = this.paidView();
+    if (id == null || !vo || vo.id == null) {
+      return;
+    }
+    const note = this.paidNoteDraft().trim().slice(0, 2000);
+    this.paidNoteSaving.set(true);
+    this.paidNoteError.set(null);
+    this.orderService
+      .getOrderRowById(id)
+      .pipe(
+        switchMap((current) => {
+          const ver = Number(current.version);
+          if (!Number.isFinite(ver) || ver < 0) {
+            return throwError(
+              () => new Error('Order version is missing. Reload the page and try again.'),
+            );
+          }
+          const body: PatchOrderNoteRequest = { note, version: ver };
+          return this.orderService.patchOrderNote(id, body);
+        }),
+        finalize(() => this.paidNoteSaving.set(false)),
+      )
+      .subscribe({
+        next: (updated) => {
+          this.paidView.set(updated);
+          this.loadedOrder.set(updated);
+          this.paidNoteDraft.set(readPosOrderNote(updated) ?? '');
+        },
+        error: (err: unknown) => {
+          this.paidNoteError.set(this.formatHttpError(err));
+        },
+      });
+  }
+
   private formatHttpError(err: unknown): string {
     if (err instanceof HttpErrorResponse) {
       const b = err.error;
@@ -413,6 +476,9 @@ export class OrderEditComponent {
         return err.error;
       }
       return err.message || `Request failed (${err.status})`;
+    }
+    if (err instanceof Error && err.message) {
+      return err.message;
     }
     return 'Could not save order.';
   }

@@ -1,9 +1,9 @@
 <div class="page">
   <a routerLink="/orders" class="back">← Back to orders</a>
   <h1>Edit order</h1>
-  <p class="hint">
-    Only open orders can be edited. Keep <span class="mono">version</span> in sync. Paid orders are read-only—use <strong>Pay</strong> from the list.
-  </p>
+<p class="hint">
+  Open orders: full edit below. <strong>Paid</strong> orders: lines and totals are locked; you can still update the <strong>order note</strong> at the bottom.
+</p>
 
   @if (loading()) {
     <p class="status">Loading…</p>
@@ -11,7 +11,7 @@
     <p class="error-banner" role="alert">{{ le }}</p>
   } @else if (orderPaid() && paidView(); as vo) {
     <div class="paid-readonly">
-      <p class="info-banner">This order is <strong>paid</strong> and cannot be edited.</p>
+      <p class="info-banner">This order is <strong>paid</strong>. Lines and payment cannot be changed; you may update the <strong>order note</strong> below.</p>
       <dl class="readonly-dl">
         <dt>Order no.</dt>
         <dd class="mono">{{ vo.orderNo }}</dd>
@@ -48,6 +48,35 @@
         <dt>Version</dt>
         <dd class="mono">{{ vo.version }}</dd>
       </dl>
+
+      <div class="paid-note-block">
+        <h2 class="paid-note-heading">Order note</h2>
+        <p class="hint-inline paid-note-hint">Optional. Saved separately from lines and payment.</p>
+        @if (paidNoteError(); as pe) {
+          <p class="error-banner" role="alert">{{ pe }}</p>
+        }
+        <label class="paid-note-label" for="paid-order-note-text">Note</label>
+        <textarea
+          id="paid-order-note-text"
+          class="paid-note-textarea"
+          rows="3"
+          maxlength="2000"
+          autocomplete="off"
+          spellcheck="false"
+          [readonly]="paidNoteSaving()"
+          [ngModel]="paidNoteDraft()"
+          (ngModelChange)="paidNoteDraft.set($event)"
+        ></textarea>
+        <button
+          type="button"
+          class="paid-note-save"
+          [disabled]="paidNoteSaving()"
+          (click)="savePaidOrderNote()"
+        >
+          {{ paidNoteSaving() ? 'Saving…' : 'Save note' }}
+        </button>
+      </div>
+
       <a routerLink="/orders" class="cancel-link">Back to orders</a>
     </div>
   } @else {
@@ -108,6 +137,23 @@
             [readonly]="submitting()"
           />
           <span class="hint-inline">No table list loaded — enter numeric id only as a fallback.</span>
+        }
+      </div>
+
+      <div class="field" [class.invalid]="form.controls.orderNote.invalid && form.controls.orderNote.touched">
+        <label for="order-edit-note">Order note (optional)</label>
+        <textarea
+          id="order-edit-note"
+          formControlName="orderNote"
+          rows="2"
+          maxlength="2000"
+          autocomplete="off"
+          placeholder="Allergies, occasion, whole-table request…"
+          [readonly]="submitting()"
+        ></textarea>
+        <span class="hint-inline">Separate from each line’s kitchen note below.</span>
+        @if (form.controls.orderNote.invalid && form.controls.orderNote.touched) {
+          <span class="err">At most 2000 characters.</span>
         }
       </div>
 

@@ -3,7 +3,7 @@
   <h1>New order</h1>
   <p class="hint">
     The server assigns a unique <strong>order number</strong>. Choose table by zone and table code; add lines and pick each food by name. Use
-    <span class="mono">version</span> <code>0</code> on new orders. Optional <strong>Kitchen note</strong> per line (allergies, spice, etc.).
+    <span class="mono">version</span> <code>0</code> on new orders. Optional <strong>Order note</strong> applies to the whole bill; <strong>Kitchen note</strong> per line is for prep (allergies, spice, etc.).
   </p>
 
   @if (errorMessage(); as msg) {
@@ -47,6 +47,22 @@
           [readonly]="submitting()"
         />
         <span class="hint-inline">Load tables from the API to pick from a list.</span>
+      }
+    </div>
+
+    <div class="field" [class.invalid]="form.controls.orderNote.invalid && form.controls.orderNote.touched">
+      <label for="order-new-note">Order note (optional)</label>
+      <textarea
+        id="order-new-note"
+        formControlName="orderNote"
+        rows="2"
+        maxlength="2000"
+        autocomplete="off"
+        placeholder="Allergies, occasion, delivery instruction…"
+        [readonly]="submitting()"
+      ></textarea>
+      @if (form.controls.orderNote.invalid && form.controls.orderNote.touched) {
+        <span class="err">At most 2000 characters.</span>
       }
     </div>
 

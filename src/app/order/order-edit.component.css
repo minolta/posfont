@@ -201,6 +201,64 @@ code {
   margin: 0;
 }
 
+.paid-note-block {
+  border: 1px solid #e2e2e2;
+  border-radius: 8px;
+  padding: 1rem 1rem 1.1rem;
+  margin: 0 0 1.25rem;
+  background: #fafafa;
+}
+
+.paid-note-heading {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.paid-note-hint {
+  margin: 0 0 0.75rem;
+}
+
+.paid-note-label {
+  display: block;
+  margin: 0 0 0.35rem;
+}
+
+.paid-note-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 0.65rem;
+  min-height: 5rem;
+  resize: vertical;
+  line-height: 1.4;
+}
+
+.paid-note-save {
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0.45rem 0.9rem;
+  border-radius: 6px;
+  border: 1px solid #c7d2fe;
+  background: #eef2ff;
+  color: #3730a3;
+  cursor: pointer;
+}
+
+.paid-note-save:hover:not(:disabled) {
+  background: #e0e7ff;
+}
+
+.paid-note-save:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.order-note-readonly {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .lines-block {
   border: 1px solid #e2e2e2;
   border-radius: 8px;

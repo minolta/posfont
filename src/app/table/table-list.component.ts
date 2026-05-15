@@ -1,7 +1,18 @@
-import { DecimalPipe } from '@angular/common';
+import { DecimalPipe, DOCUMENT, Location } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import {
+  afterNextRender,
+  ChangeDetectionStrategy,
+  Component,
+  effect,
+  ElementRef,
+  inject,
+  Injector,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
   catchError,
@@ -10,15 +21,23 @@ import {
   map,
   of,
   switchMap,
+  throwError,
   timer,
 } from 'rxjs';
 
 import type { Zone } from '../zone/zone.model';
+import { PromptPayQrDisplayComponent } from '../payment/promptpay-qr-display.component';
+import { UrlQrService } from '../payment/url-qr.service';
 import {
   orderRequestCompleteAllExceptCanceled,
   resolvedLineStatus,
 } from '../order/order-line-status.util';
-import { buildPayOrderRequest, mergePayOrderAmounts } from '../order/order-pay.util';
+import { buildPayOrderRequest, mergePayOrderAmounts, readPosOrderNote } from '../order/order-pay.util';
+import {
+  CustomerDisplaySessionService,
+  CUSTOMER_DISPLAY_WINDOW_NAME,
+} from '../order/customer-display-session.service';
+import { pingOrderCustomerDisplayRefresh } from '../order/order-customer-display-sync';
 import type { OrderLine, OrderLineStatus, PayOrderRequest, PosOrder } from '../order/order.model';
 import { OrderService } from '../order/order.service';
 import type { PosTable } from './table.model';
@@ -27,7 +46,7 @@ import { TableService } from './table.service';
 @Component({
   selector: 'app-table-list',
   standalone: true,
-  imports: [DecimalPipe, RouterLink],
+  imports: [DecimalPipe, FormsModule, RouterLink, PromptPayQrDisplayComponent],
   templateUrl: './table-list.component.html',
   styleUrl: './table-list.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -37,6 +56,12 @@ export class TableListComponent {
   private readonly orderService = inject(OrderService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly location = inject(Location);
+  private readonly document = inject(DOCUMENT);
+  private readonly urlQrService = inject(UrlQrService);
+  private readonly customerDisplaySession = inject(CustomerDisplaySessionService);
+  private readonly injector = inject(Injector);
+  private readonly payAmountInputRef = viewChild<ElementRef<HTMLInputElement>>('payAmountInput');
 
   readonly createdId = toSignal(
     this.route.queryParamMap.pipe(map((p) => p.get('created'))),
@@ -45,6 +70,12 @@ export class TableListComponent {
 
   readonly updatedId = toSignal(
     this.route.queryParamMap.pipe(map((p) => p.get('updated'))),
+    { initialValue: null as string | null },
+  );
+
+  /** Shown after creating an order from New order (`/tables?newOrder=…`). */
+  readonly newOrderId = toSignal(
+    this.route.queryParamMap.pipe(map((p) => p.get('newOrder'))),
     { initialValue: null as string | null },
   );
 
@@ -57,8 +88,20 @@ export class TableListComponent {
   readonly payingOrderId = signal<number | null>(null);
   readonly payError = signal<string | null>(null);
   readonly payDialogOrderId = signal<number | null>(null);
+  /** Fresh `GET /orders/{id}` while Settle payment is open — includes whole-order `note` when list does not. */
+  readonly payDialogOrderDetail = signal<PosOrder | null>(null);
+  readonly payDialogNoteDraft = signal('');
+  readonly payDialogNoteError = signal<string | null>(null);
   readonly payInputAmount = signal<string>('');
   readonly orderRefreshNonce = signal(0);
+
+  /** Table id when “Order QR” dialog is open; `null` when closed. */
+  readonly orderEntryQrTableId = signal<number | null>(null);
+  /** Table code (and zone) shown above the QR image. */
+  readonly orderEntryQrTableLabel = signal('');
+  readonly orderEntryQrUrl = signal('');
+  readonly orderEntryQrDataUrl = signal<string | null>(null);
+  readonly orderEntryQrError = signal<string | null>(null);
 
   readonly openOrdersByTable = toSignal(
     toObservable(this.orderRefreshNonce).pipe(
@@ -100,6 +143,22 @@ export class TableListComponent {
     { initialValue: [] as PosTable[] },
   );
 
+  constructor() {
+    effect(() => {
+      if (this.payDialogOrderId() == null) {
+        return;
+      }
+      afterNextRender(
+        () => {
+          const el = this.payAmountInputRef()?.nativeElement;
+          el?.focus();
+          el?.select();
+        },
+        { injector: this.injector },
+      );
+    });
+  }
+
   onSearchInput(value: string): void {
     this.searchTerm.set(value);
   }
@@ -119,7 +178,12 @@ export class TableListComponent {
       .subscribe({
         next: () => this.refreshNonce.update((n) => n + 1),
         error: (err: unknown) => {
-          this.deleteError.set(this.extractErrorMessage(err));
+          this.deleteError.set(
+            this.extractErrorMessage(
+              err,
+              'Could not delete table. Check API connectivity and dependencies.',
+            ),
+          );
         },
       });
   }
@@ -134,8 +198,64 @@ export class TableListComponent {
       return;
     }
     void this.router.navigate(['/orders/new/line-picker'], {
-      queryParams: { tableId },
+      queryParams: {
+        tableId,
+        ...((t.code ?? '').trim() ? { tableCode: (t.code ?? '').trim() } : {}),
+      },
     });
+  }
+
+  /**
+   * Opens a dialog with a QR code that encodes the same URL as “New order” for this table
+   * (`/orders/new/line-picker?tableId=…`), for scanning on a phone.
+   */
+  async openOrderEntryQrDialog(t: PosTable): Promise<void> {
+    const tableId = t.id;
+    if (tableId == null) {
+      return;
+    }
+    this.orderEntryQrError.set(null);
+    this.orderEntryQrDataUrl.set(null);
+    this.orderEntryQrTableId.set(tableId);
+    this.orderEntryQrTableLabel.set(this.tableOrderQrCaption(t));
+    const href = this.newOrderUrlForTable(tableId, t.code);
+    this.orderEntryQrUrl.set(href);
+    const dataUrl = await this.urlQrService.toDataUrl(href);
+    if (dataUrl == null) {
+      this.orderEntryQrError.set('Could not create QR code.');
+    } else {
+      this.orderEntryQrDataUrl.set(dataUrl);
+    }
+  }
+
+  closeOrderEntryQrDialog(): void {
+    this.orderEntryQrTableId.set(null);
+    this.orderEntryQrTableLabel.set('');
+    this.orderEntryQrUrl.set('');
+    this.orderEntryQrDataUrl.set(null);
+    this.orderEntryQrError.set(null);
+  }
+
+  copyOrderEntryLink(): void {
+    const url = this.orderEntryQrUrl().trim();
+    if (url.length === 0) {
+      return;
+    }
+    void navigator.clipboard.writeText(url);
+  }
+
+  /** Absolute URL for the line-picker new order flow with table id and optional `tableCode` in the query string. */
+  newOrderUrlForTable(tableId: number, codeRaw?: string): string {
+    const code = (codeRaw ?? '').trim();
+    const tree = this.router.createUrlTree(['/orders/new/line-picker'], {
+      queryParams: {
+        tableId,
+        ...(code ? { tableCode: code } : {}),
+      },
+    });
+    const serialized = this.router.serializeUrl(tree);
+    const path = this.location.prepareExternalUrl(serialized);
+    return new URL(path, this.document.baseURI).href;
   }
 
   openPayDialogForTable(tableId: number): void {
@@ -146,11 +266,43 @@ export class TableListComponent {
     }
     this.payError.set(null);
     this.payInputAmount.set(this.payableTotal(order).toFixed(2));
+    this.payDialogOrderDetail.set(null);
+    this.payDialogNoteDraft.set(readPosOrderNote(order) ?? '');
+    this.payDialogNoteError.set(null);
     this.payDialogOrderId.set(order.id);
+    this.refreshPayDialogOrderFromApi(order.id);
+    this.customerDisplaySession.focusOrder(order.id);
+  }
+
+  private refreshPayDialogOrderFromApi(orderId: number): void {
+    this.orderService.getOrderById(orderId).subscribe({
+      next: (full) => {
+        if (this.payDialogOrderId() === orderId && full) {
+          this.payDialogOrderDetail.set(full);
+          this.payDialogNoteDraft.set(readPosOrderNote(full) ?? '');
+        }
+      },
+      error: () => {
+        /* map entry still drives the dialog */
+      },
+    });
+  }
+
+  /** Customer-facing summary + PromptPay QR in a new tab (for a tablet facing the guest). */
+  openCustomerDisplayPage(orderId: number | null | undefined): void {
+    if (orderId == null) {
+      return;
+    }
+    this.customerDisplaySession.focusOrder(orderId);
+    const url = this.router.serializeUrl(this.router.createUrlTree(['/orders', 'display']));
+    window.open(url, CUSTOMER_DISPLAY_WINDOW_NAME);
   }
 
   closePayDialog(): void {
     this.payDialogOrderId.set(null);
+    this.payDialogOrderDetail.set(null);
+    this.payDialogNoteDraft.set('');
+    this.payDialogNoteError.set(null);
     this.payInputAmount.set('');
   }
 
@@ -158,6 +310,10 @@ export class TableListComponent {
     const orderId = this.payDialogOrderId();
     if (orderId == null) {
       return undefined;
+    }
+    const detail = this.payDialogOrderDetail();
+    if (detail != null && detail.id === orderId) {
+      return detail;
     }
     for (const o of this.openOrdersByTable().values()) {
       if (o.id === orderId) {
@@ -201,6 +357,25 @@ export class TableListComponent {
     this.submitPaymentFromDialog(order, { ...rawPay, paidByQrScan: true });
   }
 
+  confirmPayCreditFromDialog(): void {
+    const order = this.payDialogOrder();
+    if (!order || order.id == null) {
+      this.closePayDialog();
+      return;
+    }
+    if (this.payQrSettlementDisabled(order)) {
+      this.payError.set('Paid by credit needs the entered amount to equal the total (no change).');
+      return;
+    }
+    const due = this.payableTotal(order);
+    const rawPay = buildPayOrderRequest(due, due);
+    if ('error' in rawPay) {
+      this.payError.set(rawPay.error);
+      return;
+    }
+    this.submitPaymentFromDialog(order, { ...rawPay, paidByCredit: true });
+  }
+
   /** Paid by QR only when the entered amount equals the total (no under/over pay). */
   payQrSettlementDisabled(order: PosOrder): boolean {
     const id = order.id ?? 0;
@@ -233,30 +408,43 @@ export class TableListComponent {
       return;
     }
     const id = order.id;
-    const baseBody = orderRequestCompleteAllExceptCanceled(order);
-    if (baseBody == null) {
-      this.payError.set('Order has no table reference and cannot be updated.');
-      return;
-    }
-    const prepBody = mergePayOrderAmounts(baseBody, payBody);
+    /** Whole-order note from the dialog — saved on the same PUT as payment (no separate PATCH). */
+    const draft = this.payDialogNoteDraft().trim().slice(0, 2000);
+
     this.payingOrderId.set(id);
     this.payError.set(null);
+    this.payDialogNoteError.set(null);
+
     this.orderService
-      .updateOrder(id, prepBody)
+      .getOrderRowById(id)
       .pipe(
-        switchMap(() => this.orderService.payOrder(id, payBody)),
+        switchMap((fresh) => {
+          const baseBody = orderRequestCompleteAllExceptCanceled(fresh);
+          if (baseBody == null) {
+            return throwError(
+              () => new Error('Order has no table reference and cannot be updated.'),
+            );
+          }
+          const prepBody = mergePayOrderAmounts({ ...baseBody, note: draft }, payBody);
+          return this.orderService.updateOrder(id, prepBody).pipe(
+            switchMap(() => this.orderService.payOrder(id, payBody)),
+          );
+        }),
         finalize(() => this.payingOrderId.set(null)),
       )
       .subscribe({
         next: () => {
+          this.customerDisplaySession.focusOrder(id);
           this.closePayDialog();
           this.orderRefreshNonce.update((n) => n + 1);
         },
         error: (err: unknown) => {
-          this.payError.set(
-            this.httpErrorDetail(err) ||
-              'Could not record payment (line update failed, already paid, or the API is unreachable).',
+          const message = this.extractErrorMessage(
+            err,
+            'Could not record payment (check amount, note, or API).',
           );
+          this.payError.set(message);
+          this.payDialogNoteError.set(message);
         },
       });
   }
@@ -326,8 +514,15 @@ export class TableListComponent {
     return this.payableTotal(order);
   }
 
-  private extractErrorMessage(err: unknown): string {
-    return this.httpErrorDetail(err) || 'Could not delete table. Check API connectivity and dependencies.';
+  private extractErrorMessage(err: unknown, fallback: string): string {
+    const d = this.httpErrorDetail(err);
+    if (d) {
+      return d;
+    }
+    if (err instanceof Error && err.message.trim().length > 0) {
+      return err.message;
+    }
+    return fallback;
   }
 
   private httpErrorDetail(err: unknown): string {
@@ -342,8 +537,21 @@ export class TableListComponent {
       if (typeof err.error === 'string' && err.error.trim().length > 0) {
         return err.error;
       }
+      if (err.status >= 400) {
+        return `Request failed (HTTP ${err.status})`;
+      }
     }
     return '';
+  }
+
+  /** Short label for the Order QR dialog (table code + zone when present). */
+  tableOrderQrCaption(t: PosTable): string {
+    const code = (t.code ?? '').trim() || (t.id != null ? `Table #${t.id}` : 'Table');
+    const z = this.zoneCell(t.zone);
+    if (z && z !== '—') {
+      return `${code} · ${z}`;
+    }
+    return code;
   }
 
   zoneCell(z: Zone | null | undefined): string {

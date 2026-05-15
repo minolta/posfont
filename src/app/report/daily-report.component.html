@@ -4,8 +4,8 @@
     <div>
       <h1>Daily report</h1>
       <p class="hint">
-        Choose dates and refresh. Figures are for orders <strong>paid</strong> in that range. Each row shows whether settlement was <strong>cash</strong> or <strong>QR scan</strong>.
-        <strong>Cash received</strong> and <strong>change returned</strong> count only <strong>cash</strong> settlements; QR totals are under <strong>Received via QR scan</strong>.
+        Choose dates and refresh. Figures are for orders <strong>paid</strong> in that range. Each row shows whether settlement was <strong>cash</strong>, <strong>QR scan</strong>, or <strong>credit</strong>.
+        <strong>Cash received</strong> and <strong>change returned</strong> count only <strong>cash</strong> settlements; QR and credit are separate from shop cash.
         If the report service is unavailable, totals are estimated from your order list.
       </p>
     </div>
@@ -70,12 +70,12 @@
       </div>
       <div class="tile tile-cash">
         <span class="tile-label">Real cash in shop</span>
-        <span class="tile-sublabel">sales due − received via QR scan</span>
+        <span class="tile-sublabel">sales due − QR − credit</span>
         <span class="tile-val mono">{{ r.realCashSalesDueInShop | number: '1.2-2' }}</span>
       </div>
       <div class="tile tile-cash">
         <span class="tile-label">Cash received</span>
-        <span class="tile-sublabel">cash only, excl. QR</span>
+        <span class="tile-sublabel">cash only, excl. QR &amp; credit</span>
         <span class="tile-val mono">{{ r.totalCashReceived | number: '1.2-2' }}</span>
       </div>
       <div class="tile tile-qr">
@@ -85,6 +85,14 @@
       <div class="tile tile-qr">
         <span class="tile-label">Received via QR scan</span>
         <span class="tile-val mono">{{ r.totalReceivedByQrScan | number: '1.2-2' }}</span>
+      </div>
+      <div class="tile tile-credit">
+        <span class="tile-label">Paid by credit (orders)</span>
+        <span class="tile-val mono">{{ r.paidByCreditOrderCount }}</span>
+      </div>
+      <div class="tile tile-credit">
+        <span class="tile-label">Received via credit</span>
+        <span class="tile-val mono">{{ r.totalReceivedByCredit | number: '1.2-2' }}</span>
       </div>
       <div class="tile">
         <span class="tile-label">Change returned</span>
@@ -115,6 +123,8 @@
               <td>
                 @if (row.paidByQrScan) {
                   <span class="pay-kind pay-kind-qr">QR</span>
+                } @else if (row.paidByCredit) {
+                  <span class="pay-kind pay-kind-credit">Credit</span>
                 } @else {
                   <span class="pay-kind pay-kind-cash">Cash</span>
                 }
