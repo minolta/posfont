@@ -4,7 +4,7 @@
     <div>
       <h1>Daily report</h1>
       <p class="hint">
-        Choose dates and refresh. Figures are for orders <strong>paid</strong> in that range. Each row shows whether settlement was <strong>cash</strong>, <strong>QR scan</strong>, or <strong>credit</strong>.
+        Choose dates and refresh. Figures are for orders <strong>paid</strong> in that range. Each row shows payment method, <strong>order note</strong> when present, amounts due and received.
         <strong>Cash received</strong> and <strong>change returned</strong> count only <strong>cash</strong> settlements; QR and credit are separate from shop cash.
         If the report service is unavailable, totals are estimated from your order list.
       </p>
@@ -108,6 +108,7 @@
             <th>Order</th>
             <th>Paid at</th>
             <th>Payment</th>
+            <th>Order note</th>
             <th>Due</th>
             <th>Received</th>
             <th>Change</th>
@@ -129,13 +130,20 @@
                   <span class="pay-kind pay-kind-cash">Cash</span>
                 }
               </td>
+              <td class="report-order-note-cell" [attr.title]="row.orderNote || null">
+                @if (row.orderNote) {
+                  {{ row.orderNote }}
+                } @else {
+                  —
+                }
+              </td>
               <td class="mono">{{ row.totalDue | number: '1.2-2' }}</td>
               <td class="mono">{{ row.paidPrice != null ? (row.paidPrice | number: '1.2-2') : '—' }}</td>
               <td class="mono">{{ row.change != null ? (row.change | number: '1.2-2') : '—' }}</td>
             </tr>
           } @empty {
             <tr>
-              <td colspan="6" class="empty">No paid orders for this date range.</td>
+              <td colspan="7" class="empty">No paid orders for this date range.</td>
             </tr>
           }
         </tbody>

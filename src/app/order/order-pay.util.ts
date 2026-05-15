@@ -76,15 +76,16 @@ export function readOrderPaidByCredit(o: PosOrder): boolean {
   return v === true || v === 'true' || v === 1 || v === '1';
 }
 
-/** Whole-order note from API (`note` / `order_note` / `orderNote`), not line kitchen text. */
+/** Whole-order note from API (`orderNote` / `order_note` / `note`). Order-specific keys first — if `note` is `""`, `??` must not block `orderNote`. */
 export function readPosOrderNote(o: PosOrder): string | null {
   const r = o as unknown as Record<string, unknown>;
-  const v = o.note ?? r['order_note'] ?? r['orderNote'];
-  if (typeof v !== 'string') {
-    return null;
+  for (const key of ['orderNote', 'order_note', 'note', 'Note'] as const) {
+    const v = r[key];
+    if (typeof v === 'string' && v.trim().length > 0) {
+      return v.trim().slice(0, 2000);
+    }
   }
-  const t = v.trim();
-  return t.length > 0 ? t : null;
+  return null;
 }
 
 /** Trim for PUT/POST; max 2000 to match server. */

@@ -17,6 +17,10 @@ export interface DailyReportRow {
   paid_by_qr_scan?: boolean | null;
   paidByCredit?: boolean | null;
   paid_by_credit?: boolean | null;
+  /** Whole-order note when the API includes it on daily report rows. */
+  note?: string | null;
+  order_note?: string | null;
+  orderNote?: string | null;
 }
 
 /** Paid lines rolled up per food (`GET /api/reports/daily`). */
@@ -105,4 +109,6 @@ export interface DailyReportTableRow {
   change: number | null;
   paidByQrScan: boolean;
   paidByCredit: boolean;
+  /** Whole-order note; empty string when none. */
+  orderNote: string;
 }

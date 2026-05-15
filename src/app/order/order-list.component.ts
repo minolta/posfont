@@ -62,7 +62,8 @@ import { PromptPayQrDisplayComponent } from '../payment/promptpay-qr-display.com
 export class OrderListComponent {
   /** Template: show per-line kitchen note when present. */
   readonly lineKitchenNote = lineKitchenNote;
-  /** Template: payment method pills (match daily report). */
+  /** Template: whole-order note from API for list column. */
+  readonly readPosOrderNote = readPosOrderNote;
   readonly readOrderPaidByQrScan = readOrderPaidByQrScan;
   readonly readOrderPaidByCredit = readOrderPaidByCredit;
 

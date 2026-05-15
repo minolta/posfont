@@ -72,9 +72,9 @@
           <th>Cancel</th>
           <th>Paid</th>
           <th>Payment</th>
+          <th>Order note</th>
           <th title="Cash tendered (paidPrice)—for reporting">Rec’d</th>
           <th>Total/Pay</th>
-          <th>Ver.</th>
           <th class="col-actions">Actions</th>
         </tr>
       </thead>
@@ -121,6 +121,9 @@
                 —
               }
             </td>
+            <td class="order-list-order-note" [attr.title]="readPosOrderNote(o)">
+              {{ readPosOrderNote(o) ?? '—' }}
+            </td>
             <td class="mono" title="paidPrice from API (cash received)">
               @if (amountReceived(o); as rec) {
                 {{ rec | number: '1.2-2' }}
@@ -133,7 +136,6 @@
                 payableTotal(o) | number: '1.0-2'
               }}</span>
             </td>
-            <td class="mono">{{ o.version }}</td>
             <td class="col-actions">
               @if (o.id != null) {
                 <div class="order-actions">

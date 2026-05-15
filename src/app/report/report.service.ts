@@ -1,11 +1,17 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { Observable, catchError, map, throwError } from 'rxjs';
+import { Observable, catchError, forkJoin, map, of, switchMap, throwError } from 'rxjs';
 
 import { POS_API_BASE_URL } from '../api/pos-api-base-url.token';
 import { resolvedLineStatus } from '../order/order-line-status.util';
 import type { PosOrder } from '../order/order.model';
-import { readOrderPaidByCredit, readOrderPaidByQrScan, readPosOrderChange, readPosOrderPaidPrice } from '../order/order-pay.util';
+import {
+  readOrderPaidByCredit,
+  readOrderPaidByQrScan,
+  readPosOrderChange,
+  readPosOrderNote,
+  readPosOrderPaidPrice,
+} from '../order/order-pay.util';
 import { OrderService } from '../order/order.service';
 
 import type { DailyReport, DailyReportApiDto, DailyReportFoodTableRow, DailyReportTableRow } from './report.model';
@@ -89,6 +95,38 @@ function normalizeApiFoodRow(raw: unknown): DailyReportFoodTableRow {
   };
 }
 
+/**
+ * Daily report row DTOs may use `orderNote`, `order_note`, or `note`. Using `??` alone fails when
+ * `note` is present but empty — we must pick the first non-empty string (prefer order-specific keys).
+ */
+function extractDailyReportRowOrderNote(row: Record<string, unknown>): string {
+  const keyOrder = [
+    'orderNote',
+    'order_note',
+    'orderNoteText',
+    'order_note_text',
+    'Note',
+    'note',
+  ] as const;
+  for (const key of keyOrder) {
+    const v = row[key];
+    if (typeof v === 'string' && v.trim().length > 0) {
+      return v.trim().slice(0, 2000);
+    }
+  }
+  const nested = row['order'];
+  if (nested && typeof nested === 'object') {
+    const or = nested as Record<string, unknown>;
+    for (const key of ['note', 'orderNote', 'order_note']) {
+      const v = or[key];
+      if (typeof v === 'string' && v.trim().length > 0) {
+        return v.trim().slice(0, 2000);
+      }
+    }
+  }
+  return '';
+}
+
 function normalizeApiRow(raw: unknown): DailyReportTableRow {
   const row = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   const orderId = n(row['orderId'] ?? row['order_id']);
@@ -104,6 +142,7 @@ function normalizeApiRow(raw: unknown): DailyReportTableRow {
   const creditRaw = row['paidByCredit'] ?? row['paid_by_credit'];
   const paidByCredit =
     creditRaw === true || creditRaw === 'true' || creditRaw === 1 || creditRaw === '1';
+  const orderNote = extractDailyReportRowOrderNote(row);
   return {
     orderId,
     orderNo,
@@ -113,6 +152,7 @@ function normalizeApiRow(raw: unknown): DailyReportTableRow {
     change: ch != null && ch !== '' ? n(ch) : null,
     paidByQrScan,
     paidByCredit,
+    orderNote,
   };
 }
 
@@ -294,6 +334,7 @@ function aggregateOrdersClientSide(orders: PosOrder[], start: string, end: strin
       change: ch,
       paidByQrScan: paidQr,
       paidByCredit: paidCredit,
+      orderNote: readPosOrderNote(o) ?? '',
     });
     for (const ln of o.lines ?? []) {
       if (resolvedLineStatus(ln, o) === 'CANCEL') {
@@ -344,6 +385,47 @@ function aggregateOrdersClientSide(orders: PosOrder[], start: string, end: strin
   };
 }
 
+/**
+ * List and daily-report aggregate responses often omit whole-order `note`. Fill from `GET /orders/{id}`.
+ */
+function enrichReportRowsWithOrderNotes(
+  orderService: OrderService,
+  report: DailyReport,
+): Observable<DailyReport> {
+  const idList = [...new Set(report.rows.filter((r) => r.orderNote.trim() === '').map((r) => r.orderId))];
+  if (idList.length === 0) {
+    return of(report);
+  }
+  return forkJoin(
+    idList.map((id) =>
+      orderService.getOrderRowById(id).pipe(catchError(() => of(null as PosOrder | null))),
+    ),
+  ).pipe(
+    map((fullOrders) => {
+      const noteById = new Map<number, string>();
+      for (let i = 0; i < idList.length; i++) {
+        const o = fullOrders[i];
+        const id = idList[i];
+        if (o?.id === id) {
+          const n = readPosOrderNote(o);
+          if (n) {
+            noteById.set(id, n);
+          }
+        }
+      }
+      const rows: DailyReportTableRow[] = report.rows.map((r) => {
+        const merged =
+          r.orderNote.trim() || (noteById.get(r.orderId) ?? '');
+        if (merged === r.orderNote) {
+          return r;
+        }
+        return { ...r, orderNote: merged };
+      });
+      return { ...report, rows };
+    }),
+  );
+}
+
 @Injectable({ providedIn: 'root' })
 export class ReportService {
   private readonly http = inject(HttpClient);
@@ -370,9 +452,13 @@ export class ReportService {
     }
     return this.http.get<DailyReportApiDto>(`${this.rootUrl}/daily`, { params }).pipe(
       map((raw) => mapApiToDailyReport(raw, start, end)),
+      switchMap((report) => enrichReportRowsWithOrderNotes(this.orderService, report)),
       catchError((err: unknown) => {
         if (err instanceof HttpErrorResponse && err.status === 404) {
-          return this.orderService.getOrders().pipe(map((orders) => aggregateOrdersClientSide(orders, start, end)));
+          return this.orderService.getOrders().pipe(
+            map((orders) => aggregateOrdersClientSide(orders, start, end)),
+            switchMap((report) => enrichReportRowsWithOrderNotes(this.orderService, report)),
+          );
         }
         return throwError(() => err);
       }),
