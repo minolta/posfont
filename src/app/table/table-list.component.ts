@@ -244,15 +244,9 @@ export class TableListComponent {
     void navigator.clipboard.writeText(url);
   }
 
-  /** Absolute URL for the line-picker new order flow with table id and optional `tableCode` in the query string. */
-  newOrderUrlForTable(tableId: number, codeRaw?: string): string {
-    const code = (codeRaw ?? '').trim();
-    const tree = this.router.createUrlTree(['/orders/new/line-picker'], {
-      queryParams: {
-        tableId,
-        ...(code ? { tableCode: code } : {}),
-      },
-    });
+  /** Guest/menu URL (`/guest/order`). Guests pick table on device; QR no longer pins `tableId`. */
+  newOrderUrlForTable(_tableId: number, _codeRaw?: string): string {
+    const tree = this.router.createUrlTree(['/guest/order']);
     const serialized = this.router.serializeUrl(tree);
     const path = this.location.prepareExternalUrl(serialized);
     return new URL(path, this.document.baseURI).href;

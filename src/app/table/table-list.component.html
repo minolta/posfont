@@ -93,7 +93,7 @@
                 <button
                   type="button"
                   class="order-qr-link"
-                  title="Show a QR code that opens New order for this table on a phone"
+                  title="Show a QR code for guests to open the menu at this table on a phone"
                   (click)="openOrderEntryQrDialog(t)"
                 >
                   Order QR
@@ -240,7 +240,7 @@
       <div class="order-qr-dialog" (click)="$event.stopPropagation()" role="dialog" aria-labelledby="order-qr-title">
         <h3 id="order-qr-title">Scan to make order</h3>
         <p class="order-qr-hint">
-          Opens the same page as <strong>New order</strong> for this table (line picker with table pre-selected). Use on a phone or tablet on the same network as this POS.
+          Opens the guest menu on the POS network. Guests pick their table from a list, then choose dishes—open tabs for that table are updated automatically. Link is the same across tables here; the table caption is staff reference only.
         </p>
         <div class="order-qr-panel">
           @if (orderEntryQrTableLabel(); as tbl) {

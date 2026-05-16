@@ -24,6 +24,16 @@ export const routes: Routes = [
       import('./order/order-add-new.component').then((m) => m.OrderAddNewComponent),
   },
   {
+    path: 'guest/order/confirmed',
+    loadComponent: () =>
+      import('./guest/guest-order-confirmed.component').then((m) => m.GuestOrderConfirmedComponent),
+  },
+  {
+    path: 'guest/order',
+    loadComponent: () =>
+      import('./guest/guest-table-order-entry.component').then((m) => m.GuestTableOrderEntryComponent),
+  },
+  {
     path: 'orders/new/line-picker',
     component: OrderLinePickerComponent,
   },

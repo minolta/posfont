@@ -1,12 +1,21 @@
-<div class="page">
+<div class="page" [class.page--guest]="from === 'guest'">
   <button type="button" class="back-btn" (click)="backToOrder()">
-    ← {{ isExistingOrderFlow() ? 'Back to orders' : 'Back to new order' }}
+    @if (from === 'guest') {
+      ← Change table
+    } @else if (isExistingOrderFlow()) {
+      ← {{ from === 'tables' ? 'Back to tables' : 'Back to orders' }}
+    } @else {
+      ← Back to new order
+    }
   </button>
   <h1>Pick food by picture</h1>
   @if (tableCodeParam) {
     <p class="table-order-banner">
       Table <span class="mono">{{ tableCodeParam }}</span>
     </p>
+  }
+  @if (guestError(); as ge) {
+    <p class="guest-error" role="alert">{{ ge }}</p>
   }
   <p class="hint">{{ pickerHint() }}</p>
   @if (notice(); as msg) {
@@ -86,8 +95,17 @@
     }
   </div>
   <div class="confirm-row">
-    <button type="button" class="confirm-btn" [disabled]="pendingCount() < 1" (click)="confirmSave()">
-      Confirm
+    <button
+      type="button"
+      class="confirm-btn"
+      [disabled]="pendingCount() < 1 || guestSubmitting()"
+      (click)="confirmSave()"
+    >
+      @if (guestSubmitting()) {
+        Sending…
+      } @else {
+        {{ confirmButtonLabel() }}
+      }
     </button>
   </div>
 </div>
