@@ -40,6 +40,10 @@
     <p class="error" role="alert">{{ delErr }}</p>
   }
 
+  @if (blockToggleError(); as be) {
+    <p class="error" role="alert">{{ be }}</p>
+  }
+
   <div class="category-filter" role="group" aria-label="Filter by category">
     <span class="category-filter-label">Category</span>
     <div class="category-chips">
@@ -78,6 +82,7 @@
           <th>Base price</th>
           <th>Kitchen</th>
           <th>Category</th>
+          <th class="col-no-order" title="When checked, this food cannot be added as an order line">No order lines</th>
           <th>Ver.</th>
           <th class="col-actions">Actions</th>
         </tr>
@@ -85,7 +90,7 @@
       <tbody>
         @if (loading() && foods().length === 0) {
           <tr>
-            <td class="empty" colspan="9">Loading…</td>
+            <td class="empty" colspan="10">Loading…</td>
           </tr>
         }
         @for (food of displayedFoods(); track food.id ?? $index) {
@@ -119,6 +124,24 @@
             <td>{{ food.basePrice | number: '1.2-2' }}</td>
             <td>{{ kitchenCell(food.kitchen) }}</td>
             <td>{{ categoryCell(food.foodCategory) }}</td>
+            <td class="col-no-order-cell">
+              @if (food.id != null) {
+                <label class="chk-no-order">
+                  <input
+                    type="checkbox"
+                    [checked]="foodBlocksOrderLines(food)"
+                    [disabled]="blockRowSavingId() === food.id || deletingId() === food.id"
+                    (change)="setBlockOrderLine(food, $any($event.target).checked)"
+                    [attr.aria-label]="
+                      'Cannot add to orders: ' + (food.name?.trim() || food.code)
+                    "
+                  />
+                  <span class="sr-only">Block order lines</span>
+                </label>
+              } @else {
+                —
+              }
+            </td>
             <td class="mono">{{ food.version }}</td>
             <td class="col-actions">
               @if (food.id != null) {
@@ -137,7 +160,7 @@
         } @empty {
           @if (!loading()) {
             <tr>
-              <td class="empty" colspan="9">
+              <td class="empty" colspan="10">
                 @if (foods().length > 0) {
                   No foods in this category for the current search.
                 } @else {

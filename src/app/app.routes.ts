@@ -1,8 +1,19 @@
 import { Routes } from '@angular/router';
+import { jwtAuthGuard } from './auth/jwt-auth.guard';
 import { OrderLinePickerComponent } from './order/order-line-picker.component';
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'tables' },
+  {
+    path: 'login',
+    loadComponent: () => import('./auth/login.component').then((m) => m.LoginComponent),
+  },
+  {
+    path: 'users',
+    loadComponent: () =>
+      import('./users/user-management.component').then((m) => m.UserManagementComponent),
+    canActivate: [jwtAuthGuard],
+  },
   {
     path: 'tables/new',
     loadComponent: () =>

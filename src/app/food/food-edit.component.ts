@@ -16,7 +16,7 @@ import {
 } from 'rxjs';
 
 import { FoodCategoryService } from '../food-category/food-category.service';
-import type { Food, FoodCategory, Kitchen } from './food.model';
+import { foodBlocksOrderLines, type Food, type FoodCategory, type Kitchen } from './food.model';
 import { FoodService } from './food.service';
 import { KitchenService } from '../kitchen/kitchen.service';
 
@@ -107,6 +107,8 @@ export class FoodEditComponent {
     code: ['', [Validators.required, Validators.pattern(/\S/)]],
     name: ['', [Validators.required, Validators.pattern(/\S/)]],
     basePrice: [0, [Validators.required, Validators.min(0)]],
+    /** When true, staff cannot put this SKU on orders (shows in Foods list checkbox). */
+    blockOrderLine: [false],
     kitchenId: [''],
     manualKitchenQuery: [''],
     foodCategoryId: ['', Validators.required],
@@ -152,6 +154,7 @@ export class FoodEditComponent {
           code: food.code,
           name: food.name ?? '',
           basePrice: food.basePrice,
+          blockOrderLine: foodBlocksOrderLines(food),
           kitchenId: kid != null ? String(kid) : '',
           manualKitchenQuery: '',
           foodCategoryId: cid != null ? String(cid) : '',
@@ -302,6 +305,7 @@ export class FoodEditComponent {
             kitchenId,
             foodCategoryId,
             version: Number(v.version),
+            blockOrderLine: !!v.blockOrderLine,
           }),
         ),
         finalize(() => this.submitting.set(false)),

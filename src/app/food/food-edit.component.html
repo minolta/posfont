@@ -39,6 +39,14 @@
         }
       </div>
 
+      <div class="field row-check">
+        <label class="check">
+          <input type="checkbox" formControlName="blockOrderLine" />
+          Do not allow this food on order lines
+        </label>
+        <span class="hint-inline">Keeps catalog / kitchen display-only; unchecked allows ordering.</span>
+      </div>
+
       <div class="field" [class.invalid]="form.controls.kitchenId.invalid && form.controls.kitchenId.touched">
         <label for="kitchen-select">Kitchen</label>
         @if (lookups().kitchens.length > 0) {

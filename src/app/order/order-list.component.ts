@@ -26,7 +26,7 @@ import {
   timer,
 } from 'rxjs';
 
-import type { Food } from '../food/food.model';
+import { foodBlocksOrderLines, type Food } from '../food/food.model';
 import { FoodService } from '../food/food.service';
 import type { PosTable } from '../table/table.model';
 import { foodPickerLabel, tablePickerLabel } from './order-merge.util';
@@ -533,10 +533,22 @@ export class OrderListComponent {
   filteredFoodsForAddLine(orderId: number): Food[] {
     const q = this.addLineFoodSearch(orderId).trim().toLowerCase();
     const all = this.foods();
-    if (!q) {
-      return all;
+    const selRaw = this.addLineFood(orderId);
+    const selId = Number(selRaw);
+
+    let base = all.filter((f) => !foodBlocksOrderLines(f));
+    if (q) {
+      base = base.filter((f) => this.foodLabel(f).toLowerCase().includes(q));
     }
-    return all.filter((f) => this.foodLabel(f).toLowerCase().includes(q));
+
+    if (!Number.isFinite(selId) || selId < 1) {
+      return base;
+    }
+    const picked = all.find((f) => f.id === selId);
+    if (!picked || base.some((f) => f.id === selId)) {
+      return base;
+    }
+    return [picked, ...base];
   }
 
   selectedFoodForAddLine(orderId: number): Food | undefined {
@@ -569,6 +581,11 @@ export class OrderListComponent {
     }
     if (!Number.isFinite(qty) || qty < 1) {
       this.addLineError.set('Quantity must be at least 1.');
+      return;
+    }
+    const foodRow = this.foods().find((f) => f.id === pickedFoodId);
+    if (foodRow && foodBlocksOrderLines(foodRow)) {
+      this.addLineError.set('This food cannot be ordered (blocked in Foods list).');
       return;
     }
     this.addLineToOrder(o, pickedFoodId, qty);

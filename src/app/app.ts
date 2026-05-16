@@ -3,11 +3,17 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter, map, startWith } from 'rxjs';
 
+import { JwtAuthService } from './auth/jwt-auth.service';
+
 function shouldHideStaffChrome(rawUrl: string): boolean {
   const pathMatch = rawUrl.match(/^([^?#]*)/);
   const path = (pathMatch?.[1] ?? '').trim();
 
   if (path === '/guest' || path.startsWith('/guest/')) {
+    return true;
+  }
+
+  if (path === '/login') {
     return true;
   }
 
@@ -29,8 +35,14 @@ function shouldHideStaffChrome(rawUrl: string): boolean {
 })
 export class App {
   private readonly router = inject(Router);
+  protected readonly jwtAuth = inject(JwtAuthService);
 
   protected readonly title = signal('posfont');
+
+  protected logout(): void {
+    this.jwtAuth.logout();
+    void this.router.navigate(['/login']);
+  }
 
   /** Main POS chrome (header + links); hidden for `/guest/**` and guest line-picker (`from=guest`). */
   protected readonly staffChromeVisible = toSignal(

@@ -95,6 +95,8 @@ export class FoodAddNewComponent {
     code: ['', [Validators.required, Validators.pattern(/\S/)]],
     name: ['', [Validators.required, Validators.pattern(/\S/)]],
     basePrice: [0, [Validators.required, Validators.min(0)]],
+    /** When true, this SKU cannot be added to orders (kitchen-only listing). */
+    blockOrderLine: [false],
     /** Set when the kitchen `<select>` is shown; value is kitchen id as string. */
     kitchenId: [''],
     /** When no kitchen list is loaded: type name, code, or id — resolved via `GET /api/kitchens?q=` on save. */
@@ -221,6 +223,7 @@ export class FoodAddNewComponent {
               kitchenId,
               foodCategoryId,
               version: Number(v.version),
+              blockOrderLine: !!v.blockOrderLine,
             })
             .pipe(
               switchMap((created) => {

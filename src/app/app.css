@@ -67,6 +67,21 @@
   flex-shrink: 0;
 }
 
+.app-header .nav-button {
+  margin-left: 0.15rem;
+  padding: 0.35rem 0.55rem;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: transparent;
+  color: #fafafa;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.app-header .nav-button:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
 .app-main {
   flex: 1;
   padding: 0;

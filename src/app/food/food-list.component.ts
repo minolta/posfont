@@ -22,7 +22,14 @@ import {
 } from 'rxjs';
 
 import { FoodCategoryService } from '../food-category/food-category.service';
-import type { Food, FoodCategory, Kitchen } from './food.model';
+import {
+  foodBlocksOrderLines,
+  foodUpdateRequestSnapshot,
+  type Food,
+  type FoodCategory,
+  type FoodRequest,
+  type Kitchen,
+} from './food.model';
 import { FoodService } from './food.service';
 
 @Component({
@@ -72,6 +79,9 @@ export class FoodListComponent {
   readonly error = signal<string | null>(null);
   readonly deletingId = signal<number | null>(null);
   readonly deleteError = signal<string | null>(null);
+  /** Busy row when toggling block-order-line in the list. */
+  readonly blockRowSavingId = signal<number | null>(null);
+  readonly blockToggleError = signal<string | null>(null);
 
   readonly foods = toSignal(
     combineLatest([toObservable(this.searchTerm), toObservable(this.refreshNonce)]).pipe(
@@ -130,6 +140,33 @@ export class FoodListComponent {
 
   selectCategoryFilter(categoryId: number | null): void {
     this.selectedCategoryId.set(categoryId);
+  }
+
+  /** Expose for template — whether this food cannot be used on new order lines. */
+  readonly foodBlocksOrderLines = foodBlocksOrderLines;
+
+  setBlockOrderLine(food: Food, blocked: boolean): void {
+    if (food.id == null) {
+      return;
+    }
+    this.blockToggleError.set(null);
+    let body: FoodRequest;
+    try {
+      body = foodUpdateRequestSnapshot(food, { blockOrderLine: blocked });
+    } catch {
+      this.blockToggleError.set('Food is missing kitchen or category — use Edit to fix.');
+      return;
+    }
+    this.blockRowSavingId.set(food.id);
+    this.foodService
+      .updateFood(food.id, body)
+      .pipe(finalize(() => this.blockRowSavingId.set(null)))
+      .subscribe({
+        next: () => this.refreshNonce.update((n) => n + 1),
+        error: (err: unknown) => {
+          this.blockToggleError.set(this.extractErrorMessage(err));
+        },
+      });
   }
 
   deleteFood(food: Food): void {

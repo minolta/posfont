@@ -1,0 +1,91 @@
+<div class="user-admin">
+  <header class="page-header">
+    <div>
+      <h1>User management</h1>
+      <p class="sub">Requires JWT from <code>/api/auth/login</code>. Bearer token is sent automatically.</p>
+    </div>
+    <div class="header-actions">
+      <button type="button" class="ghost" (click)="reloadUsers()" [disabled]="loading()">
+        {{ loading() ? 'Loading…' : 'Refresh' }}
+      </button>
+      <button type="button" class="ghost danger" (click)="logout()">Sign out</button>
+      <a routerLink="/tables" class="link-back">POS</a>
+    </div>
+  </header>
+
+  @if (listError(); as le) {
+    <div class="banner error" role="alert">{{ le }}</div>
+  }
+
+  <section class="panel">
+    <h2>Add user</h2>
+    @if (formError(); as fe) {
+      <div class="inline-error" role="alert">{{ fe }}</div>
+    }
+    <form [formGroup]="createForm" (ngSubmit)="createUser()" class="create-form" novalidate>
+      <label class="field">
+        <span>Username</span>
+        <input type="text" formControlName="username" maxlength="255" autocomplete="off" />
+      </label>
+      <label class="field">
+        <span>Password</span>
+        <input type="password" formControlName="password" autocomplete="new-password" />
+      </label>
+      <label class="field">
+        <span>Display name</span>
+        <input type="text" formControlName="displayName" maxlength="255" />
+      </label>
+      <label class="field wide">
+        <span>Roles (comma-separated)</span>
+        <input type="text" formControlName="rolesCsv" placeholder="ADMIN, STAFF" maxlength="512" />
+      </label>
+      <button type="submit" class="primary" [disabled]="saving()">
+        {{ saving() ? 'Saving…' : 'Create user' }}
+      </button>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2>Users</h2>
+    @if (loading() && users().length === 0) {
+      <p class="muted">Loading users…</p>
+    } @else if (users().length === 0) {
+      <p class="muted">No users returned. Check API <code>GET /api/users</code>.</p>
+    } @else {
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Username</th>
+              <th>Display name</th>
+              <th>Roles</th>
+              <th>Enabled</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (u of users(); track u.id) {
+              <tr>
+                <td class="mono">{{ u.username }}</td>
+                <td>{{ u.displayName ?? '—' }}</td>
+                <td class="roles">{{ rolesLabel(u.roles) }}</td>
+                <td>
+                  @if (u.enabled !== false) {
+                    <span class="pill ok">Yes</span>
+                  } @else {
+                    <span class="pill off">No</span>
+                  }
+                </td>
+                <td class="actions">
+                  <button type="button" class="small" (click)="toggleEnabled(u)">
+                    {{ u.enabled === false ? 'Enable' : 'Disable' }}
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </section>
+</div>

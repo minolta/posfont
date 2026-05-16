@@ -151,3 +151,17 @@ button[type='submit']:disabled {
   color: #991b1b;
   font-size: 0.9rem;
 }
+
+.row-check .check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.row-check input[type='checkbox'] {
+  width: 1rem;
+  height: 1rem;
+}

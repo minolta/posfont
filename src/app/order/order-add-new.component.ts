@@ -11,7 +11,7 @@ import {
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { catchError, finalize, forkJoin, map, of, switchMap } from 'rxjs';
 
-import type { Food } from '../food/food.model';
+import { foodBlocksOrderLines, type Food } from '../food/food.model';
 import { FoodService } from '../food/food.service';
 import type { PosTable } from '../table/table.model';
 import { TableService } from '../table/table.service';
@@ -176,8 +176,11 @@ export class OrderAddNewComponent {
     const q = this.foodSearch().trim().toLowerCase();
     const selId = Number(foodIdRaw ?? '');
     const base = !q
-      ? fs
-      : fs.filter((f) => foodPickerLabel(f).toLowerCase().includes(q));
+      ? fs.filter((f) => !foodBlocksOrderLines(f))
+      : fs.filter(
+          (f) =>
+            !foodBlocksOrderLines(f) && foodPickerLabel(f).toLowerCase().includes(q),
+        );
     if (!Number.isFinite(selId) || selId < 1) {
       return base;
     }
@@ -208,6 +211,10 @@ export class OrderAddNewComponent {
           ? Number(g.get('foodId')?.value)
           : Number((g.get('manualFoodId')?.value ?? '').toString().trim());
       if (!Number.isFinite(fid) || fid < 1 || !Number.isFinite(q) || q < 1) {
+        return false;
+      }
+      const foodMeta = fs.length > 0 ? fs.find((fx) => fx.id === fid) : undefined;
+      if (foodMeta && foodBlocksOrderLines(foodMeta)) {
         return false;
       }
     }

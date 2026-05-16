@@ -4,7 +4,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { catchError, map, of } from 'rxjs';
 
-import type { Food } from '../food/food.model';
+import { foodBlocksOrderLines, type Food } from '../food/food.model';
 import { FoodService } from '../food/food.service';
 import { foodPickerLabel } from './order-merge.util';
 
@@ -36,15 +36,15 @@ export class OrderLineFoodPickerComponent {
 
   filteredFoods(): Food[] {
     const q = this.search().trim().toLowerCase();
-    const all = this.foods();
+    const allowed = this.foods().filter((f) => !foodBlocksOrderLines(f));
     if (!q) {
-      return all;
+      return allowed;
     }
-    return all.filter((f) => foodPickerLabel(f).toLowerCase().includes(q));
+    return allowed.filter((f) => foodPickerLabel(f).toLowerCase().includes(q));
   }
 
   pick(food: Food): void {
-    if (food.id == null) {
+    if (food.id == null || foodBlocksOrderLines(food)) {
       return;
     }
     const qty = Math.max(1, Math.floor(Number(this.qty())));

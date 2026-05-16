@@ -23,6 +23,13 @@
           [routerLinkActiveOptions]="{ exact: false }"
           >Reports</a
         >
+        <span class="nav-divider" aria-hidden="true"></span>
+        @if (jwtAuth.isAuthenticated()) {
+          <a routerLink="/users" routerLinkActive="active">Users</a>
+          <button type="button" class="nav-button" (click)="logout()">Sign out</button>
+        } @else {
+          <a routerLink="/login" routerLinkActive="active">Sign in</a>
+        }
       </nav>
     </header>
   }

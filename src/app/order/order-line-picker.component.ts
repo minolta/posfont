@@ -5,7 +5,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { catchError, finalize, map, of, switchMap } from 'rxjs';
 
-import type { Food } from '../food/food.model';
+import { foodBlocksOrderLines, type Food } from '../food/food.model';
 import { FoodService } from '../food/food.service';
 import { buildOrderRequestAppendQueuedLines } from '../guest/build-order-append-queue.util';
 import { defaultDatetimeLocal, normalizeLocalDateTimeForApi } from './order-datetime.util';
@@ -60,10 +60,13 @@ export class OrderLinePickerComponent {
   filteredFoods(): Food[] {
     const q = this.search().trim().toLowerCase();
     const catKey = this.selectedCategoryKey();
-    const byCategory =
+    let byCategory =
       catKey === 'ALL'
-        ? this.foods()
-        : this.foods().filter((f) => this.categoryKeyOfFood(f) === catKey);
+        ? this.foods().filter((f) => !foodBlocksOrderLines(f))
+        : this.foods().filter(
+            (f) =>
+              !foodBlocksOrderLines(f) && this.categoryKeyOfFood(f) === catKey,
+          );
     if (!q) {
       return byCategory;
     }
@@ -73,6 +76,9 @@ export class OrderLinePickerComponent {
   categoryButtons(): Array<{ key: string; label: string }> {
     const byKey = new Map<string, string>();
     for (const f of this.foods()) {
+      if (foodBlocksOrderLines(f)) {
+        continue;
+      }
       const key = this.categoryKeyOfFood(f);
       if (key === 'NONE') {
         continue;
@@ -105,7 +111,7 @@ export class OrderLinePickerComponent {
   }
 
   pick(food: Food): void {
-    if (food.id == null) {
+    if (food.id == null || foodBlocksOrderLines(food)) {
       return;
     }
     const qty = Math.max(1, Math.floor(Number(this.qty())));

@@ -1,0 +1,35 @@
+<div class="login-page">
+  <div class="login-card">
+    <h1 class="login-title">Staff sign in</h1>
+    <p class="login-hint">Use credentials issued by your POS API (<code>/api/auth/login</code>).</p>
+
+    @if (errorMessage(); as err) {
+      <div class="login-error" role="alert">{{ err }}</div>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="submit()" class="login-form" novalidate>
+      <label class="field">
+        <span class="label">Username</span>
+        <input type="text" formControlName="username" autocomplete="username" maxlength="255" />
+      </label>
+      @if (form.controls.username.invalid && form.controls.username.touched) {
+        <span class="field-error">Username is required.</span>
+      }
+
+      <label class="field">
+        <span class="label">Password</span>
+        <input type="password" formControlName="password" autocomplete="current-password" />
+      </label>
+      @if (form.controls.password.invalid && form.controls.password.touched) {
+        <span class="field-error">Password is required.</span>
+      }
+
+      <div class="actions">
+        <button type="submit" class="primary" [disabled]="submitting()">
+          {{ submitting() ? 'Signing in…' : 'Sign in' }}
+        </button>
+        <a routerLink="/tables" class="secondary-link">Back to POS</a>
+      </div>
+    </form>
+  </div>
+</div>
