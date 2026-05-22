@@ -1,9 +1,12 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, OnInit, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter, map, startWith } from 'rxjs';
 
 import { JwtAuthService } from './auth/jwt-auth.service';
+import { LangSwitchComponent } from './i18n/lang-switch.component';
+import { LocaleService } from './i18n/locale.service';
+import { TranslatePipe } from './i18n/translate.pipe';
 
 function shouldHideStaffChrome(rawUrl: string): boolean {
   const pathMatch = rawUrl.match(/^([^?#]*)/);
@@ -29,13 +32,18 @@ function shouldHideStaffChrome(rawUrl: string): boolean {
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, TranslatePipe, LangSwitchComponent],
   templateUrl: './app.html',
   styleUrl: './app.css',
 })
-export class App {
+export class App implements OnInit {
   private readonly router = inject(Router);
+  private readonly locale = inject(LocaleService);
   protected readonly jwtAuth = inject(JwtAuthService);
+
+  ngOnInit(): void {
+    this.locale.setLocale(this.locale.locale());
+  }
 
   protected readonly title = signal('posfont');
 

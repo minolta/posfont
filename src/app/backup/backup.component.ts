@@ -12,17 +12,20 @@ import { catchError, finalize, of } from 'rxjs';
 
 import type { BackupExportResponse, BackupImportResponse } from './backup.service';
 import { BackupService } from './backup.service';
+import { LocaleService } from '../i18n/locale.service';
+import { TranslatePipe } from '../i18n/translate.pipe';
 
 @Component({
   selector: 'app-backup',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, TranslatePipe],
   templateUrl: './backup.component.html',
   styleUrl: './backup.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class BackupComponent {
   private readonly backupService = inject(BackupService);
+  private readonly i18n = inject(LocaleService);
   readonly fileInput = viewChild<ElementRef<HTMLInputElement>>('importFile');
 
   readonly exporting = signal(false);
@@ -35,15 +38,41 @@ export class BackupComponent {
   readonly pendingImportFileName = signal<string | null>(null);
   private pendingImportFile: File | null = null;
 
+  /** Inclusive calendar bounds for exporting `orders` by `orderDate`; blank = no bound. */
+  readonly ordersExportFrom = signal<string>('');
+  readonly ordersExportTo = signal<string>('');
+
   readonly canImport = (): boolean =>
     !!this.pendingImportFile && this.importAck() && !this.importing() && !this.exporting();
 
+  ordersExportFromInput(ev: Event): void {
+    this.ordersExportFrom.set((ev.target as HTMLInputElement).value);
+  }
+
+  ordersExportToInput(ev: Event): void {
+    this.ordersExportTo.set((ev.target as HTMLInputElement).value);
+  }
+
+  clearOrdersExportRange(): void {
+    this.ordersExportFrom.set('');
+    this.ordersExportTo.set('');
+  }
+
   createBackup(): void {
+    const from = this.ordersExportFrom().trim();
+    const to = this.ordersExportTo().trim();
+    if (from && to && from > to) {
+      this.error.set(this.i18n.translate('backup.dateRangeInvalid'));
+      return;
+    }
     this.exporting.set(true);
     this.error.set(null);
     this.importResult.set(null);
     this.backupService
-      .exportAllRecords()
+      .exportAllRecords(
+        from || undefined,
+        to || undefined,
+      )
       .pipe(
         finalize(() => this.exporting.set(false)),
         catchError((err: unknown) => {
@@ -147,7 +176,7 @@ export class BackupComponent {
       this.extractHttpErrorMessage(err).then((msg) => this.error.set(msg));
       return;
     }
-    this.error.set('Backup request failed.');
+    this.error.set(this.i18n.translate('backup.requestFailed'));
   }
 
   private async extractHttpErrorMessage(err: HttpErrorResponse): Promise<string> {
@@ -167,7 +196,7 @@ export class BackupComponent {
         body = m.trim();
       }
     }
-    const msg = body || err.message || 'Request failed';
+    const msg = body || err.message || this.i18n.translate('common.requestFailed');
     return `${msg} (${err.status})`;
   }
 }

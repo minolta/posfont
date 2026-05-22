@@ -11,19 +11,22 @@ import {
   switchMap,
 } from 'rxjs';
 
+import { LangSwitchComponent } from '../i18n/lang-switch.component';
+import { LocaleService } from '../i18n/locale.service';
+import { TranslatePipe } from '../i18n/translate.pipe';
 import { PromptPayQrDisplayComponent } from '../payment/promptpay-qr-display.component';
 import { CustomerDisplaySessionService } from './customer-display-session.service';
 import { ORDER_CUSTOMER_DISPLAY_PING_PREFIX } from './order-customer-display-sync';
 import { resolvedLineStatus } from './order-line-status.util';
 import type { OrderLine, OrderLineStatus, PosOrder } from './order.model';
-import { orderPaymentMethodLabel, readPosOrderNote } from './order-pay.util';
+import { readPosOrderNote } from './order-pay.util';
 import { OrderService } from './order.service';
 
 /** Customer-facing order total + PromptPay QR; polls the API so it updates after staff edits or payment. */
 @Component({
   selector: 'app-order-customer-display',
   standalone: true,
-  imports: [DecimalPipe, PromptPayQrDisplayComponent],
+  imports: [DecimalPipe, PromptPayQrDisplayComponent, TranslatePipe, LangSwitchComponent],
   templateUrl: './order-customer-display.component.html',
   styleUrl: './order-customer-display.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -31,6 +34,7 @@ import { OrderService } from './order.service';
 export class OrderCustomerDisplayComponent {
   readonly displaySession = inject(CustomerDisplaySessionService);
   private readonly orderService = inject(OrderService);
+  private readonly i18n = inject(LocaleService);
 
   readonly order = signal<PosOrder | undefined>(undefined);
   readonly loadError = signal<string | null>(null);
@@ -77,9 +81,7 @@ export class OrderCustomerDisplayComponent {
           this.order.set(o);
           this.loadError.set(null);
         } else if (this.order() === undefined) {
-          this.loadError.set(
-            'Could not load this order. It may have been removed or the server is offline.',
-          );
+          this.loadError.set(this.i18n.translate('display.couldNotLoadOrder'));
         }
         this.initialLoading.set(false);
       });
@@ -106,18 +108,18 @@ export class OrderCustomerDisplayComponent {
   lineLabel(line: OrderLine): string {
     const f = line.food;
     if (f == null) {
-      return '—';
+      return this.i18n.translate('common.emptyDash');
     }
     const name = f.name?.trim();
     const code = f.code?.trim();
     if (name) {
       return name;
     }
-    return code || '—';
+    return code || this.i18n.translate('common.emptyDash');
   }
 
   paidMethod(o: PosOrder): string {
-    return orderPaymentMethodLabel(o);
+    return this.i18n.orderPaymentMethodLabel(o);
   }
 
   orderNote(o: PosOrder): string | null {

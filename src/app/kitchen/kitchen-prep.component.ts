@@ -11,6 +11,8 @@ import { RouterLink } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { catchError, finalize, map, merge, of, switchMap, take, tap, timer } from 'rxjs';
 
+import { LocaleService } from '../i18n/locale.service';
+import { TranslatePipe } from '../i18n/translate.pipe';
 import { OrderService } from '../order/order.service';
 import { resolvedLineStatus } from '../order/order-line-status.util';
 import { orderLineRequestNotePart } from '../order/order-line-note.util';
@@ -36,7 +38,7 @@ function readStoredKitchenSelection(): string {
 @Component({
   selector: 'app-kitchen-prep',
   standalone: true,
-  imports: [RouterLink, DatePipe],
+  imports: [RouterLink, DatePipe, TranslatePipe],
   templateUrl: './kitchen-prep.component.html',
   styleUrl: './kitchen-prep.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -44,6 +46,7 @@ function readStoredKitchenSelection(): string {
 export class KitchenPrepComponent {
   private readonly orderService = inject(OrderService);
   private readonly kitchenService = inject(KitchenService);
+  private readonly i18n = inject(LocaleService);
 
   /** Shown in page hint; matches `AUTO_REFRESH_MS`. */
   readonly autoRefreshSeconds = Math.round(AUTO_REFRESH_MS / 1000);
@@ -190,7 +193,7 @@ export class KitchenPrepComponent {
     if (name && name !== code) {
       return `${code} · ${name}`;
     }
-    return code || name || (k.id != null ? `#${k.id}` : 'Kitchen');
+    return code || name || (k.id != null ? `#${k.id}` : this.i18n.translate('common.kitchen'));
   }
 
   trackRow(_: number, row: KitchenPrepRow): string {
@@ -199,9 +202,14 @@ export class KitchenPrepComponent {
 
   private fmtLoadErr(err: unknown): string {
     if (err instanceof HttpErrorResponse) {
-      return err.message || `Could not load orders (${err.status})`;
+      return (
+        err.message ||
+        this.i18n.translate('common.requestFailedHttp', { status: err.status })
+      );
     }
-    return 'Could not load orders.';
+    return this.i18n.translate('common.couldNotLoad', {
+      entity: this.i18n.translate('order.entity'),
+    });
   }
 
   private fmtPrepUpdateErr(err: unknown): string {
@@ -216,8 +224,11 @@ export class KitchenPrepComponent {
       if (typeof err.error === 'string' && err.error.trim().length > 0) {
         return err.error;
       }
-      return err.message || `Could not update line (${err.status})`;
+      return (
+        err.message ||
+        this.i18n.translate('common.requestFailedHttp', { status: err.status })
+      );
     }
-    return 'Could not update line status.';
+    return this.i18n.translate('order.cannotUpdate');
   }
 }

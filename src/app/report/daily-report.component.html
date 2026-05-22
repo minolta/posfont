@@ -1,17 +1,13 @@
 <div class="report-page">
-  <a routerLink="/orders" class="back">← Orders</a>
+  <a routerLink="/orders" class="back">{{ 'report.backOrders' | t }}</a>
   <header class="report-head">
     <div>
-      <h1>Daily report</h1>
-      <p class="hint">
-        Choose dates and refresh. Figures are for orders <strong>paid</strong> in that range. Each row shows payment method, <strong>order note</strong> when present, amounts due and received.
-        <strong>Cash received</strong> and <strong>change returned</strong> count only <strong>cash</strong> settlements; QR and credit are separate from shop cash.
-        If the report service is unavailable, totals are estimated from your order list.
-      </p>
+      <h1>{{ 'report.dailyTitle' | t }}</h1>
+      <p class="hint">{{ 'report.dailyHint' | t }}</p>
     </div>
     <div class="controls">
       <label class="field">
-        <span class="label-text">Start date</span>
+        <span class="label-text">{{ 'report.startDate' | t }}</span>
         <input
           type="date"
           [value]="startDate()"
@@ -20,7 +16,7 @@
         />
       </label>
       <label class="field">
-        <span class="label-text">End date</span>
+        <span class="label-text">{{ 'report.endDate' | t }}</span>
         <input
           type="date"
           [value]="endDate()"
@@ -29,7 +25,7 @@
         />
       </label>
       <button type="button" class="btn-refresh" [disabled]="loading()" (click)="refresh()">
-        {{ loading() ? 'Loading…' : 'Refresh' }}
+        {{ loading() ? ('common.loading' | t) : ('common.refresh' | t) }}
       </button>
     </div>
   </header>
@@ -39,64 +35,76 @@
   }
 
   @if (loading() && report() === null) {
-    <p class="status">Loading…</p>
+    <p class="status">{{ 'common.loading' | t }}</p>
   }
 
   @if (report(); as r) {
     <p class="source-line">
       @if (r.source === 'api') {
-        <span class="badge badge-api">Server report</span>
+        <span class="badge badge-api">{{ 'report.serverReport' | t }}</span>
       } @else {
-        <span class="badge badge-cli">Locally aggregated</span>
-        <span class="muted">endpoint not implemented (404).</span>
+        <span class="badge badge-cli">{{ 'report.localAggregated' | t }}</span>
+        <span class="muted">{{ 'report.endpoint404' | t }}</span>
       }
       @if (isMultiDay(r)) {
         <span class="range-pill mono">{{ r.startDate }} — {{ r.endDate }}</span>
       }
     </p>
 
-    <section class="summary" aria-label="Summary">
+    <section class="summary">
       <div class="tile">
-        <span class="tile-label">@if (isMultiDay(r)) { Orders (range overlap) } @else { Orders (day overlap) }</span>
+        <span class="tile-label">
+          @if (isMultiDay(r)) {
+            {{ 'report.ordersRange' | t }}
+          } @else {
+            {{ 'report.ordersDay' | t }}
+          }
+        </span>
         <span class="tile-val mono">{{ r.orderCount }}</span>
       </div>
       <div class="tile">
-        <span class="tile-label">@if (isMultiDay(r)) { Paid in range } @else { Paid this day }</span>
+        <span class="tile-label">
+          @if (isMultiDay(r)) {
+            {{ 'report.paidInRange' | t }}
+          } @else {
+            {{ 'report.paidThisDay' | t }}
+          }
+        </span>
         <span class="tile-val mono">{{ r.paidOrderCount }}</span>
       </div>
       <div class="tile">
-        <span class="tile-label">Sales due (lines)</span>
+        <span class="tile-label">{{ 'report.salesDue' | t }}</span>
         <span class="tile-val mono">{{ r.totalSales | number: '1.2-2' }}</span>
       </div>
       <div class="tile tile-cash">
-        <span class="tile-label">Real cash in shop</span>
-        <span class="tile-sublabel">sales due − QR − credit</span>
+        <span class="tile-label">{{ 'report.realCash' | t }}</span>
+        <span class="tile-sublabel">{{ 'report.salesMinusQrCredit' | t }}</span>
         <span class="tile-val mono">{{ r.realCashSalesDueInShop | number: '1.2-2' }}</span>
       </div>
       <div class="tile tile-cash">
-        <span class="tile-label">Cash received</span>
-        <span class="tile-sublabel">cash only, excl. QR &amp; credit</span>
+        <span class="tile-label">{{ 'report.cashReceived' | t }}</span>
+        <span class="tile-sublabel">{{ 'report.cashOnlyHint' | t }}</span>
         <span class="tile-val mono">{{ r.totalCashReceived | number: '1.2-2' }}</span>
       </div>
       <div class="tile tile-qr">
-        <span class="tile-label">Paid by QR (orders)</span>
+        <span class="tile-label">{{ 'report.paidByQr' | t }}</span>
         <span class="tile-val mono">{{ r.paidByQrScanOrderCount }}</span>
       </div>
       <div class="tile tile-qr">
-        <span class="tile-label">Received via QR scan</span>
+        <span class="tile-label">{{ 'report.receivedQr' | t }}</span>
         <span class="tile-val mono">{{ r.totalReceivedByQrScan | number: '1.2-2' }}</span>
       </div>
       <div class="tile tile-credit">
-        <span class="tile-label">Paid by credit (orders)</span>
+        <span class="tile-label">{{ 'report.paidByCredit' | t }}</span>
         <span class="tile-val mono">{{ r.paidByCreditOrderCount }}</span>
       </div>
       <div class="tile tile-credit">
-        <span class="tile-label">Received via credit</span>
+        <span class="tile-label">{{ 'report.receivedCredit' | t }}</span>
         <span class="tile-val mono">{{ r.totalReceivedByCredit | number: '1.2-2' }}</span>
       </div>
       <div class="tile">
-        <span class="tile-label">Change returned</span>
-        <span class="tile-sublabel">from cash only</span>
+        <span class="tile-label">{{ 'report.changeReturned' | t }}</span>
+        <span class="tile-sublabel">{{ 'report.fromCashOnly' | t }}</span>
         <span class="tile-val mono">{{ r.totalChange | number: '1.2-2' }}</span>
       </div>
     </section>
@@ -105,13 +113,13 @@
       <table>
         <thead>
           <tr>
-            <th>Order</th>
-            <th>Paid at</th>
-            <th>Payment</th>
-            <th>Order note</th>
-            <th>Due</th>
-            <th>Received</th>
-            <th>Change</th>
+            <th>{{ 'common.order' | t }}</th>
+            <th>{{ 'report.paidAt' | t }}</th>
+            <th>{{ 'common.payment' | t }}</th>
+            <th>{{ 'report.orderNote' | t }}</th>
+            <th>{{ 'report.due' | t }}</th>
+            <th>{{ 'report.received' | t }}</th>
+            <th>{{ 'common.change' | t }}</th>
           </tr>
         </thead>
         <tbody>
@@ -123,46 +131,44 @@
               <td>{{ row.paidAt | date: 'short' }}</td>
               <td>
                 @if (row.paidByQrScan) {
-                  <span class="pay-kind pay-kind-qr">QR</span>
+                  <span class="pay-kind pay-kind-qr">{{ 'order.paymentQr' | t }}</span>
                 } @else if (row.paidByCredit) {
-                  <span class="pay-kind pay-kind-credit">Credit</span>
+                  <span class="pay-kind pay-kind-credit">{{ 'order.paymentCredit' | t }}</span>
                 } @else {
-                  <span class="pay-kind pay-kind-cash">Cash</span>
+                  <span class="pay-kind pay-kind-cash">{{ 'order.paymentCash' | t }}</span>
                 }
               </td>
               <td class="report-order-note-cell" [attr.title]="row.orderNote || null">
                 @if (row.orderNote) {
                   {{ row.orderNote }}
                 } @else {
-                  —
+                  {{ 'common.emptyDash' | t }}
                 }
               </td>
               <td class="mono">{{ row.totalDue | number: '1.2-2' }}</td>
-              <td class="mono">{{ row.paidPrice != null ? (row.paidPrice | number: '1.2-2') : '—' }}</td>
-              <td class="mono">{{ row.change != null ? (row.change | number: '1.2-2') : '—' }}</td>
+              <td class="mono">{{ row.paidPrice != null ? (row.paidPrice | number: '1.2-2') : ('common.emptyDash' | t) }}</td>
+              <td class="mono">{{ row.change != null ? (row.change | number: '1.2-2') : ('common.emptyDash' | t) }}</td>
             </tr>
           } @empty {
             <tr>
-              <td colspan="7" class="empty">No paid orders for this date range.</td>
+              <td colspan="7" class="empty">{{ 'report.noPaidOrders' | t }}</td>
             </tr>
           }
         </tbody>
       </table>
     </div>
 
-    <h2 class="section-title">By food</h2>
-    <p class="section-hint">
-      Quantities and line totals from <strong>paid</strong> orders in this range (non-cancelled lines). Rows sorted by <strong>total</strong>, then <strong>quantity</strong> (highest first).
-    </p>
+    <h2 class="section-title">{{ 'report.byFood' | t }}</h2>
+    <p class="section-hint">{{ 'report.byFoodHint' | t }}</p>
 
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
-            <th>Code</th>
-            <th>Name</th>
-            <th>Qty</th>
-            <th>Total</th>
+            <th>{{ 'common.code' | t }}</th>
+            <th>{{ 'common.name' | t }}</th>
+            <th>{{ 'common.qty' | t }}</th>
+            <th>{{ 'common.total' | t }}</th>
           </tr>
         </thead>
         <tbody>
@@ -175,7 +181,7 @@
             </tr>
           } @empty {
             <tr>
-              <td colspan="4" class="empty">No line items for paid orders in this range.</td>
+              <td colspan="4" class="empty">{{ 'report.noLineItems' | t }}</td>
             </tr>
           }
         </tbody>

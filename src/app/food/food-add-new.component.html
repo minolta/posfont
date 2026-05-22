@@ -1,9 +1,7 @@
 <div class="page">
-  <a routerLink="/foods" class="back">← Back to foods</a>
-  <h1>Add food</h1>
-  <p class="hint">
-    Pick kitchen by name, code, or id from the list. If the list is empty, type the same in the lookup field—we resolve it when you save. Categories load when available.
-  </p>
+  <a routerLink="/foods" class="back">{{ 'common.backTo' | t:{target: ('food.backFoods' | t)} }}</a>
+  <h1>{{ 'food.addTitle' | t }}</h1>
+  <p class="hint">{{ 'food.addHintKitchen' | t }}</p>
 
   @if (errorMessage(); as msg) {
     <p class="error-banner" role="alert">{{ msg }}</p>
@@ -11,55 +9,55 @@
 
   <form [formGroup]="form" (ngSubmit)="submit()">
     <div class="field" [class.invalid]="form.controls.code.invalid && form.controls.code.touched">
-      <label for="code">Code</label>
-      <input id="code" type="text" formControlName="code" autocomplete="off" placeholder="e.g. BRG-CLSC" />
+      <label for="code">{{ 'common.code' | t }}</label>
+      <input id="code" type="text" formControlName="code" autocomplete="off" [attr.placeholder]="'food.codeExample' | t" />
       @if (form.controls.code.invalid && form.controls.code.touched) {
-        <span class="err">Code is required.</span>
+        <span class="err">{{ 'common.required' | t:{field: ('common.code' | t)} }}</span>
       }
     </div>
 
     <div class="field" [class.invalid]="form.controls.name.invalid && form.controls.name.touched">
-      <label for="name">Name</label>
-      <input id="name" type="text" formControlName="name" autocomplete="off" placeholder="e.g. Classic burger" />
+      <label for="name">{{ 'common.name' | t }}</label>
+      <input id="name" type="text" formControlName="name" autocomplete="off" [attr.placeholder]="'food.nameExample' | t" />
       @if (form.controls.name.invalid && form.controls.name.touched) {
-        <span class="err">Name is required.</span>
+        <span class="err">{{ 'common.required' | t:{field: ('common.name' | t)} }}</span>
       }
     </div>
 
     <div class="field" [class.invalid]="form.controls.basePrice.invalid && form.controls.basePrice.touched">
-      <label for="basePrice">Base price</label>
+      <label for="basePrice">{{ 'common.basePrice' | t }}</label>
       <input id="basePrice" type="number" formControlName="basePrice" min="0" step="0.01" />
       @if (form.controls.basePrice.invalid && form.controls.basePrice.touched) {
-        <span class="err">Enter a price ≥ 0.</span>
+        <span class="err">{{ 'common.priceMinZero' | t }}</span>
       }
     </div>
 
     <div class="field row-check">
       <label class="check">
         <input type="checkbox" formControlName="blockOrderLine" />
-        Do not allow this food on order lines
+        {{ 'food.doNotAllowOrder' | t }}
       </label>
-      <span class="hint-inline">Use for display-only catalog items.</span>
+      <span class="hint-inline">{{ 'food.displayOnly' | t }}</span>
     </div>
 
     <div class="field" [class.invalid]="form.controls.kitchenId.invalid && form.controls.kitchenId.touched">
-      <label for="kitchen-select">Kitchen</label>
+      <label for="kitchen-select">{{ 'common.kitchen' | t }}</label>
       @if (lookups().kitchens.length > 0) {
         <div class="pick-with-search">
-          <label class="label-text" for="kitchen-search">Find kitchen (name, code, or id)</label>
+          <label class="label-text" for="kitchen-search">{{ 'common.find' | t:{entity: ('common.kitchen' | t)} }}</label>
           <input
             id="kitchen-search"
             type="search"
             autocomplete="off"
-            placeholder="Type kitchen name, code, or id…"
+            [attr.placeholder]="'food.kitchenPlaceholder' | t"
             [value]="kitchenSearch()"
             (input)="kitchenSearch.set($any($event.target).value)"
           />
           @if (filterKitchens(lookups().kitchens).length === 0) {
-            <p class="filter-empty">No kitchens match — clear search to see all.</p>
+            <p class="filter-empty">{{ 'common.noMatchSearch' | t:{entity: ('common.kitchen' | t)} }}</p>
           }
-          <select id="kitchen-select" formControlName="kitchenId" aria-label="Kitchen, value is id">
-            <option value="" disabled>Choose kitchen…</option>
+          <select id="kitchen-select" formControlName="kitchenId" [attr.aria-label]="'common.kitchen' | t">
+            <option value="" disabled>{{ 'common.choose' | t:{entity: ('common.kitchen' | t)} }}</option>
             @for (k of filterKitchens(lookups().kitchens); track k.id) {
               <option [value]="k.id">{{ kitchenOptionLabel(k) }}</option>
             }
@@ -67,40 +65,40 @@
         </div>
       } @else {
         <div class="pick-with-search">
-          <label class="label-text" for="kitchen-manual">Kitchen (name, code, or id)</label>
+          <label class="label-text" for="kitchen-manual">{{ 'food.kitchenLookup' | t }}</label>
           <input
             id="kitchen-manual"
             type="text"
             formControlName="manualKitchenQuery"
             autocomplete="off"
-            placeholder="e.g. Main kitchen, KT-001, or 1"
+            [attr.placeholder]="'food.kitchenExample' | t"
           />
-          <p class="hint-inline">We resolve the kitchen when you save (code, full name, id, or one clear search hit).</p>
+          <p class="hint-inline">{{ 'food.resolveKitchen' | t }}</p>
         </div>
       }
       @if (form.controls.kitchenId.invalid && form.controls.kitchenId.touched) {
-        <span class="err">Kitchen is required.</span>
+        <span class="err">{{ 'common.required' | t:{field: ('common.kitchen' | t)} }}</span>
       }
     </div>
 
     <div class="field" [class.invalid]="form.controls.foodCategoryId.invalid && form.controls.foodCategoryId.touched">
-      <label for="category-select">Category</label>
+      <label for="category-select">{{ 'common.category' | t }}</label>
       @if (lookups().categories.length > 0) {
         <div class="pick-with-search">
-          <label class="label-text" for="category-search">Find category by name</label>
+          <label class="label-text" for="category-search">{{ 'food.categoryLookup' | t }}</label>
           <input
             id="category-search"
             type="search"
             autocomplete="off"
-            placeholder="Type category name, code, or id…"
+            [attr.placeholder]="'food.categoryPlaceholder' | t"
             [value]="categorySearch()"
             (input)="categorySearch.set($any($event.target).value)"
           />
           @if (filterCategories(lookups().categories).length === 0) {
-            <p class="filter-empty">No categories match — clear search to see all.</p>
+            <p class="filter-empty">{{ 'common.noMatchSearch' | t:{entity: ('common.category' | t)} }}</p>
           }
-          <select id="category-select" formControlName="foodCategoryId" aria-label="Category, value is id">
-            <option value="" disabled>Choose category by name…</option>
+          <select id="category-select" formControlName="foodCategoryId" [attr.aria-label]="'common.category' | t">
+            <option value="" disabled>{{ 'common.choose' | t:{entity: ('common.category' | t)} }}</option>
             @for (c of filterCategories(lookups().categories); track c.id) {
               <option [value]="c.id">{{ categoryOptionLabel(c) }}</option>
             }
@@ -113,16 +111,16 @@
           formControlName="foodCategoryId"
           min="1"
           step="1"
-          placeholder="Category id"
+          [attr.placeholder]="'food.categoryId' | t"
         />
       }
       @if (form.controls.foodCategoryId.invalid && form.controls.foodCategoryId.touched) {
-        <span class="err">Category is required.</span>
+        <span class="err">{{ 'common.required' | t:{field: ('common.category' | t)} }}</span>
       }
     </div>
 
     <div class="field">
-      <label for="food-picture">Picture (optional)</label>
+      <label for="food-picture">{{ 'food.picture' | t }} {{ 'common.optional' | t }}</label>
       <input
         id="food-picture"
         type="file"
@@ -130,13 +128,13 @@
         (change)="onPictureSelected($event)"
       />
       @if (pendingPicture(); as pic) {
-        <p class="hint-inline">{{ pic.name }} — <button type="button" class="linkish" (click)="clearPendingPicture()">Remove</button></p>
+        <p class="hint-inline">{{ pic.name }} — <button type="button" class="linkish" (click)="clearPendingPicture()">{{ 'common.remove' | t }}</button></p>
       }
     </div>
 
     <div class="actions">
       <button type="submit" [disabled]="submitting() || !canSubmitForm()">
-        {{ submitting() ? 'Saving…' : 'Create food' }}
+        {{ submitting() ? ('common.saving' | t) : ('food.createFood' | t) }}
       </button>
     </div>
   </form>

@@ -1,61 +1,59 @@
 <div class="page">
-  <a routerLink="/orders" class="back">← Back to orders</a>
-  <h1>Edit order</h1>
-<p class="hint">
-  Open orders: full edit below. <strong>Paid</strong> orders: lines and totals are locked; you can still update the <strong>order note</strong> at the bottom.
-</p>
+  <a routerLink="/orders" class="back">{{ 'common.backTo' | t:{ target: ('order.backOrders' | t) } }}</a>
+  <h1>{{ 'order.editTitle' | t }}</h1>
+  <p class="hint" [innerHTML]="'order.editHintOpen' | t"></p>
 
   @if (loading()) {
-    <p class="status">Loading…</p>
+    <p class="status">{{ 'common.loading' | t }}</p>
   } @else if (loadError(); as le) {
     <p class="error-banner" role="alert">{{ le }}</p>
   } @else if (orderPaid() && paidView(); as vo) {
     <div class="paid-readonly">
-      <p class="info-banner">This order is <strong>paid</strong>. Lines and payment cannot be changed; you may update the <strong>order note</strong> below.</p>
+      <p class="info-banner" [innerHTML]="'order.editHintPaid' | t"></p>
       <dl class="readonly-dl">
-        <dt>Order no.</dt>
+        <dt>{{ 'order.orderNo' | t }}</dt>
         <dd class="mono">{{ vo.orderNo }}</dd>
-        <dt>Table</dt>
+        <dt>{{ 'common.table' | t }}</dt>
         <dd>{{ tableCell(vo.table) }}</dd>
-        <dt>Lines</dt>
+        <dt>{{ 'common.lines' | t }}</dt>
         <dd>{{ linesSummary(vo) }}</dd>
-        <dt>Order date</dt>
+        <dt>{{ 'common.orderDate' | t }}</dt>
         <dd>{{ formatDateShort(vo.orderDate) }}</dd>
-        <dt>Paid at</dt>
+        <dt>{{ 'order.paidAt' | t }}</dt>
         <dd>{{ formatDateShort(vo.paidAt) }}</dd>
-        <dt>Payment method</dt>
+        <dt>{{ 'order.paymentMethod' | t }}</dt>
         <dd>{{ paidSettlementLabel(vo) }}</dd>
-        <dt>Total pay</dt>
+        <dt>{{ 'order.totalPayLabel' | t }}</dt>
         <dd class="mono">{{ totalPay(vo) | number: '1.2-2' }}</dd>
-        <dt>Amount received</dt>
+        <dt>{{ 'order.amountReceived' | t }}</dt>
         <dd class="mono">
           @let at = paidAmountTendered(vo);
           @if (at !== null) {
             {{ at | number: '1.2-2' }}
           } @else {
-            —
+            {{ 'common.emptyDash' | t }}
           }
         </dd>
-        <dt>Change</dt>
+        <dt>{{ 'common.change' | t }}</dt>
         <dd class="mono">
           @let ch = paidChangeAmount(vo);
           @if (ch !== null) {
             {{ ch | number: '1.2-2' }}
           } @else {
-            —
+            {{ 'common.emptyDash' | t }}
           }
         </dd>
-        <dt>Version</dt>
+        <dt>{{ 'common.version' | t }}</dt>
         <dd class="mono">{{ vo.version }}</dd>
       </dl>
 
       <div class="paid-note-block">
-        <h2 class="paid-note-heading">Order note</h2>
-        <p class="hint-inline paid-note-hint">Optional. Saved separately from lines and payment.</p>
+        <h2 class="paid-note-heading">{{ 'order.orderNote' | t }}</h2>
+        <p class="hint-inline paid-note-hint">{{ 'order.orderNoteSeparate' | t }}</p>
         @if (paidNoteError(); as pe) {
           <p class="error-banner" role="alert">{{ pe }}</p>
         }
-        <label class="paid-note-label" for="paid-order-note-text">Note</label>
+        <label class="paid-note-label" for="paid-order-note-text">{{ 'common.note' | t }}</label>
         <textarea
           id="paid-order-note-text"
           class="paid-note-textarea"
@@ -73,11 +71,11 @@
           [disabled]="paidNoteSaving()"
           (click)="savePaidOrderNote()"
         >
-          {{ paidNoteSaving() ? 'Saving…' : 'Save note' }}
+          {{ paidNoteSaving() ? ('common.saving' | t) : ('order.saveNote' | t) }}
         </button>
       </div>
 
-      <a routerLink="/orders" class="cancel-link">Back to orders</a>
+      <a routerLink="/orders" class="cancel-link">{{ 'order.backOrdersPaid' | t }}</a>
     </div>
   } @else {
     @if (saveError(); as se) {
@@ -86,7 +84,7 @@
 
     <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
       <div class="field" [class.invalid]="form.controls.orderNo.invalid && form.controls.orderNo.touched">
-        <label for="order-edit-no">Order number</label>
+        <label for="order-edit-no">{{ 'order.orderNumber' | t }}</label>
         <input
           id="order-edit-no"
           type="text"
@@ -97,28 +95,28 @@
           [readonly]="submitting()"
         />
         @if (form.controls.orderNo.invalid && form.controls.orderNo.touched) {
-          <span class="err">Enter a non-empty order number.</span>
+          <span class="err">{{ 'order.nonEmptyOrderNo' | t }}</span>
         }
       </div>
 
       <div class="field">
-        <label for="order-edit-table">Table</label>
+        <label for="order-edit-table">{{ 'common.table' | t }}</label>
         @if (tables().length > 0) {
           <div class="pick-with-search">
-            <label class="label-text" for="order-edit-table-search">Find table</label>
+            <label class="label-text" for="order-edit-table-search">{{ 'order.findTable' | t }}</label>
             <input
               id="order-edit-table-search"
               type="search"
               autocomplete="off"
-              placeholder="Zone or table name…"
+              [placeholder]="'order.tableZonePlaceholder' | t"
               [value]="tableSearch()"
               (input)="tableSearch.set($any($event.target).value)"
             />
             @if (filterTables(tables()).length === 0) {
-              <p class="filter-empty">No tables match — clear search to see all.</p>
+              <p class="filter-empty">{{ 'common.noMatchSearch' | t:{ entity: ('common.table' | t) } }}</p>
             }
             <select id="order-edit-table" formControlName="tableId" [disabled]="submitting()">
-              <option value="">Select a table (by zone name)…</option>
+              <option value="">{{ 'order.selectTable' | t }}</option>
               @for (t of filterTables(tables()); track t.id ?? $index) {
                 @if (t.id != null) {
                   <option [value]="'' + t.id">{{ tableOptionLabel(t) }}</option>
@@ -133,41 +131,41 @@
             formControlName="manualTableId"
             min="1"
             step="1"
-            placeholder="Numeric id only if the list did not load"
+            [placeholder]="'order.tableIdFallback' | t"
             [readonly]="submitting()"
           />
-          <span class="hint-inline">No table list loaded — enter numeric id only as a fallback.</span>
+          <span class="hint-inline">{{ 'order.noTableList' | t }}</span>
         }
       </div>
 
       <div class="field" [class.invalid]="form.controls.orderNote.invalid && form.controls.orderNote.touched">
-        <label for="order-edit-note">Order note (optional)</label>
+        <label for="order-edit-note">{{ 'order.orderNoteOptional' | t }}</label>
         <textarea
           id="order-edit-note"
           formControlName="orderNote"
           rows="2"
           maxlength="2000"
           autocomplete="off"
-          placeholder="Allergies, occasion, whole-table request…"
+          [placeholder]="'order.orderNotePlaceholder' | t"
           [readonly]="submitting()"
         ></textarea>
-        <span class="hint-inline">Separate from each line’s kitchen note below.</span>
+        <span class="hint-inline">{{ 'order.lineNoteSeparate' | t }}</span>
         @if (form.controls.orderNote.invalid && form.controls.orderNote.touched) {
-          <span class="err">At most 2000 characters.</span>
+          <span class="err">{{ 'order.orderNoteMax' | t }}</span>
         }
       </div>
 
       <fieldset class="lines-block">
-        <legend>Line items</legend>
-        <p class="hint-inline lines-hint">At least one line. Replacing lines updates foods and quantities; unit price is set on save from each food’s current base price. Use <strong>Kitchen note</strong> per line for prep instructions.</p>
+        <legend>{{ 'order.lineItems' | t }}</legend>
+        <p class="hint-inline lines-hint" [innerHTML]="'order.linesHint' | t"></p>
         <div formArrayName="lines">
           @for (line of lines.controls; track $index; let i = $index) {
             <div [formGroupName]="i" class="line-row">
               <div class="field line-food">
-                <label [attr.for]="'order-edit-line-food-' + i">Food</label>
+                <label [attr.for]="'order-edit-line-food-' + i">{{ 'order.food' | t }}</label>
                 @if (foods().length > 0) {
                   <select [id]="'order-edit-line-food-' + i" formControlName="foodId" [disabled]="submitting()">
-                    <option value="">Select food by name…</option>
+                    <option value="">{{ 'order.selectFood' | t }}</option>
                     @for (f of filterFoodsForLine(foods(), line.get('foodId')?.value); track $index) {
                       @if (f.id != null) {
                         <option [value]="'' + f.id">{{ foodOptionLabel(f) }}</option>
@@ -181,13 +179,13 @@
                     formControlName="manualFoodId"
                     min="1"
                     step="1"
-                    placeholder="Numeric id only if the list did not load"
+                    [placeholder]="'order.tableIdFallback' | t"
                     [readonly]="submitting()"
                   />
                 }
               </div>
               <div class="field line-qty">
-                <label [attr.for]="'order-edit-line-qty-' + i">Qty</label>
+                <label [attr.for]="'order-edit-line-qty-' + i">{{ 'common.qty' | t }}</label>
                 <input
                   [id]="'order-edit-line-qty-' + i"
                   type="number"
@@ -198,13 +196,13 @@
                 />
               </div>
               <div class="field line-note-field">
-                <label [attr.for]="'order-edit-line-note-' + i">Kitchen note</label>
+                <label [attr.for]="'order-edit-line-note-' + i">{{ 'order.kitchenNote' | t }}</label>
                 <textarea
                   [id]="'order-edit-line-note-' + i"
                   formControlName="note"
                   rows="2"
                   maxlength="500"
-                  placeholder="Optional — allergy, spice, timing…"
+                  [placeholder]="'order.kitchenNotePlaceholder' | t"
                   [readonly]="submitting()"
                 ></textarea>
               </div>
@@ -214,42 +212,42 @@
                 [disabled]="submitting() || lines.length <= 1"
                 (click)="removeLine(i)"
               >
-                Remove
+                {{ 'common.remove' | t }}
               </button>
             </div>
           }
         </div>
         <div class="pick-with-search global-food-search">
-          <label class="label-text" for="order-edit-food-search">Find food (all rows)</label>
+          <label class="label-text" for="order-edit-food-search">{{ 'order.findFoodAllRows' | t }}</label>
           <input
             id="order-edit-food-search"
             type="search"
             autocomplete="off"
-            placeholder="Food name…"
+            [placeholder]="'order.foodNamePlaceholder' | t"
             [value]="foodSearch()"
             (input)="foodSearch.set($any($event.target).value)"
           />
         </div>
-        <button type="button" class="btn-add-line" [disabled]="submitting()" (click)="addLine()">Add line</button>
+        <button type="button" class="btn-add-line" [disabled]="submitting()" (click)="addLine()">{{ 'order.addLineBtn' | t }}</button>
       </fieldset>
 
       <div class="field" [class.invalid]="form.controls.orderDate.invalid && form.controls.orderDate.touched">
-        <label for="order-edit-date">Order date / time</label>
+        <label for="order-edit-date">{{ 'order.orderDateTime' | t }}</label>
         <input id="order-edit-date" type="datetime-local" formControlName="orderDate" [readonly]="submitting()" />
         @if (form.controls.orderDate.invalid && form.controls.orderDate.touched) {
-          <span class="err">Set the order date.</span>
+          <span class="err">{{ 'order.setOrderDate' | t }}</span>
         }
       </div>
 
       <div class="field row-check">
         <label class="check">
           <input type="checkbox" formControlName="complateOrder" [disabled]="submitting()" />
-          Complete (done)
+          {{ 'order.completeDone' | t }}
         </label>
       </div>
 
       <div class="field">
-        <label for="order-edit-complate-date">Complete date / time (optional)</label>
+        <label for="order-edit-complate-date">{{ 'order.completeOptional' | t }}</label>
         <input
           id="order-edit-complate-date"
           type="datetime-local"
@@ -261,12 +259,12 @@
       <div class="field row-check">
         <label class="check">
           <input type="checkbox" formControlName="cancel" [disabled]="submitting()" />
-          Cancelled
+          {{ 'common.cancelled' | t }}
         </label>
       </div>
 
       <div class="field" [class.invalid]="form.controls.version.invalid && form.controls.version.touched">
-        <label for="order-edit-version">Version</label>
+        <label for="order-edit-version">{{ 'common.version' | t }}</label>
         <input
           id="order-edit-version"
           type="number"
@@ -276,15 +274,15 @@
           [readonly]="submitting()"
         />
         @if (form.controls.version.invalid && form.controls.version.touched) {
-          <span class="err">Version must be ≥ 0.</span>
+          <span class="err">{{ 'order.versionMinZero' | t }}</span>
         }
       </div>
 
       <div class="actions">
         <button type="submit" [disabled]="submitting() || !canSubmitForm()">
-          {{ submitting() ? 'Saving…' : 'Save changes' }}
+          {{ submitting() ? ('common.saving' | t) : ('common.saveChanges' | t) }}
         </button>
-        <a routerLink="/orders" class="cancel-link">Cancel</a>
+        <a routerLink="/orders" class="cancel-link">{{ 'common.cancel' | t }}</a>
       </div>
     </form>
   }

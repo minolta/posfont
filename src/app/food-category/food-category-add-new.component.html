@@ -1,9 +1,7 @@
 <div class="page">
-  <a routerLink="/food-categories" class="back">← Back to categories</a>
-  <h1>New food category</h1>
-  <p class="hint">
-    Code required; optional name. Use <span class="mono">version</span> <code>0</code> for new rows.
-  </p>
+  <a routerLink="/food-categories" class="back">{{ 'common.backTo' | t:{target: ('foodCategory.backCategories' | t)} }}</a>
+  <h1>{{ 'foodCategory.addTitle' | t }}</h1>
+  <p class="hint">{{ 'foodCategory.addHint' | t }}</p>
 
   @if (errorMessage(); as msg) {
     <p class="error-banner" role="alert">{{ msg }}</p>
@@ -11,7 +9,7 @@
 
   <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
     <div class="field" [class.invalid]="form.controls.code.invalid && form.controls.code.touched">
-      <label for="fc-code">Code</label>
+      <label for="fc-code">{{ 'common.code' | t }}</label>
       <input
         id="fc-code"
         type="text"
@@ -19,33 +17,33 @@
         autocomplete="off"
         spellcheck="false"
         maxlength="255"
-        placeholder="e.g. BEV-HOT"
+        [attr.placeholder]="'foodCategory.codeExample' | t"
         [readonly]="submitting()"
       />
       @if (form.controls.code.invalid && form.controls.code.touched) {
-        <span class="err">Enter a unique code (not only spaces).</span>
+        <span class="err">{{ 'common.uniqueCode' | t }}</span>
       }
     </div>
 
     <div class="field" [class.invalid]="form.controls.name.invalid && form.controls.name.touched">
-      <label for="fc-name">Name (optional)</label>
+      <label for="fc-name">{{ 'foodCategory.nameOptional' | t }}</label>
       <input
         id="fc-name"
         type="text"
         formControlName="name"
         autocomplete="off"
         maxlength="255"
-        placeholder="e.g. Hot beverages"
+        [attr.placeholder]="'foodCategory.nameExample' | t"
         [readonly]="submitting()"
       />
       @if (form.controls.name.invalid && form.controls.name.touched) {
-        <span class="err">Name is too long.</span>
+        <span class="err">{{ 'common.nameTooLong' | t }}</span>
       }
     </div>
 
     <div class="actions">
       <button type="submit" [disabled]="submitting() || form.invalid">
-        {{ submitting() ? 'Saving…' : 'Create category' }}
+        {{ submitting() ? ('common.saving' | t) : ('foodCategory.createCategory' | t) }}
       </button>
     </div>
   </form>

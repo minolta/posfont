@@ -1,12 +1,10 @@
 <div class="page">
-  <a routerLink="/food-categories" class="back">← Back to categories</a>
-  <h1>Edit food category</h1>
-  <p class="hint">
-    Set code and optional name; include <span class="mono">version</span> for optimistic locking.
-  </p>
+  <a routerLink="/food-categories" class="back">{{ 'common.backTo' | t:{target: ('foodCategory.backCategories' | t)} }}</a>
+  <h1>{{ 'foodCategory.editTitle' | t }}</h1>
+  <p class="hint">{{ 'foodCategory.editHint' | t }}</p>
 
   @if (loading()) {
-    <p class="status">Loading…</p>
+    <p class="status">{{ 'common.loading' | t }}</p>
   } @else if (loadError(); as le) {
     <p class="error-banner" role="alert">{{ le }}</p>
   } @else {
@@ -16,7 +14,7 @@
 
     <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
       <div class="field" [class.invalid]="form.controls.code.invalid && form.controls.code.touched">
-        <label for="fc-edit-code">Code</label>
+        <label for="fc-edit-code">{{ 'common.code' | t }}</label>
         <input
           id="fc-edit-code"
           type="text"
@@ -27,12 +25,12 @@
           [readonly]="submitting()"
         />
         @if (form.controls.code.invalid && form.controls.code.touched) {
-          <span class="err">Enter a valid code.</span>
+          <span class="err">{{ 'common.validCode' | t }}</span>
         }
       </div>
 
       <div class="field" [class.invalid]="form.controls.name.invalid && form.controls.name.touched">
-        <label for="fc-edit-name">Name (optional)</label>
+        <label for="fc-edit-name">{{ 'foodCategory.nameOptional' | t }}</label>
         <input
           id="fc-edit-name"
           type="text"
@@ -42,12 +40,12 @@
           [readonly]="submitting()"
         />
         @if (form.controls.name.invalid && form.controls.name.touched) {
-          <span class="err">Name is too long.</span>
+          <span class="err">{{ 'common.nameTooLong' | t }}</span>
         }
       </div>
 
       <div class="field" [class.invalid]="form.controls.version.invalid && form.controls.version.touched">
-        <label for="fc-edit-version">Version</label>
+        <label for="fc-edit-version">{{ 'common.version' | t }}</label>
         <input
           id="fc-edit-version"
           type="number"
@@ -57,13 +55,13 @@
           [readonly]="submitting()"
         />
         @if (form.controls.version.invalid && form.controls.version.touched) {
-          <span class="err">Version must be a non‑negative integer (from the server).</span>
+          <span class="err">{{ 'common.versionNonNegative' | t }}</span>
         }
       </div>
 
       <div class="actions">
         <button type="submit" [disabled]="submitting() || form.invalid">
-          {{ submitting() ? 'Saving…' : 'Save changes' }}
+          {{ submitting() ? ('common.saving' | t) : ('common.saveChanges' | t) }}
         </button>
       </div>
     </form>

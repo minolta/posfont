@@ -4,12 +4,15 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 
+import { LangSwitchComponent } from '../i18n/lang-switch.component';
+import { LocaleService } from '../i18n/locale.service';
+import { TranslatePipe } from '../i18n/translate.pipe';
 import { JwtAuthService } from './jwt-auth.service';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, TranslatePipe, LangSwitchComponent],
   templateUrl: './login.component.html',
   styleUrl: './login.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -19,6 +22,7 @@ export class LoginComponent {
   private readonly auth = inject(JwtAuthService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly i18n = inject(LocaleService);
 
   readonly submitting = signal(false);
   readonly errorMessage = signal<string | null>(null);
@@ -44,7 +48,7 @@ export class LoginComponent {
       .subscribe({
         next: () => {
           if (!this.auth.isAuthenticated()) {
-            this.errorMessage.set('Login succeeded but no token was returned.');
+            this.errorMessage.set(this.i18n.translate('auth.noToken'));
             return;
           }
           const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
@@ -72,8 +76,10 @@ export class LoginComponent {
       if (typeof err.error === 'string' && err.error.length > 0) {
         return err.error;
       }
-      return err.message || `Request failed (${err.status})`;
+      return (
+        err.message || this.i18n.translate('common.requestFailedHttp', { status: err.status })
+      );
     }
-    return 'Could not sign in.';
+    return this.i18n.translate('auth.couldNotSignIn');
   }
 }

@@ -29,6 +29,9 @@ import {
   readPosOrderNote,
 } from '../order/order-pay.util';
 import { OrderService } from '../order/order.service';
+import { LocaleService } from '../i18n/locale.service';
+import { TranslatePipe } from '../i18n/translate.pipe';
+import { LangSwitchComponent } from '../i18n/lang-switch.component';
 import { PromptPayQrDisplayComponent } from '../payment/promptpay-qr-display.component';
 
 /** First unpaid order for table (aligned with Tables list convention). */
@@ -61,7 +64,7 @@ function sameGuestTableQuery(a: ParamMap, b: ParamMap): boolean {
 @Component({
   selector: 'app-guest-table-order-entry',
   standalone: true,
-  imports: [DecimalPipe, FormsModule, PromptPayQrDisplayComponent],
+  imports: [DecimalPipe, FormsModule, PromptPayQrDisplayComponent, TranslatePipe, LangSwitchComponent],
   templateUrl: './guest-table-order-entry.component.html',
   styleUrl: './guest-table-order-entry.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -73,6 +76,7 @@ export class GuestTableOrderEntryComponent {
   private readonly orderService = inject(OrderService);
   private readonly tableService = inject(TableService);
   private readonly customerDisplaySession = inject(CustomerDisplaySessionService);
+  private readonly i18n = inject(LocaleService);
 
   readonly error = signal<string | null>(null);
   readonly resolving = signal(true);
@@ -173,7 +177,7 @@ export class GuestTableOrderEntryComponent {
       },
       error: () => {
         this.refreshingOrders.set(false);
-        this.error.set('Could not refresh your order.');
+        this.error.set(this.i18n.translate('guest.couldNotRefresh'));
       },
     });
   }
@@ -206,7 +210,7 @@ export class GuestTableOrderEntryComponent {
         this.showPayment.set(true);
       },
       error: () => {
-        this.payError.set('Could not load the latest bill. Try Refresh.');
+        this.payError.set(this.i18n.translate('guest.couldNotLoadBill'));
       },
     });
   }
@@ -239,7 +243,7 @@ export class GuestTableOrderEntryComponent {
     const amount = Number(this.payInputAmount());
     const rawPay = buildPayOrderRequest(amount, this.payableTotal(order));
     if ('error' in rawPay) {
-      this.payError.set(rawPay.error);
+      this.payError.set(this.i18n.translate(rawPay.error));
       return;
     }
     this.submitPayment(order, rawPay);
@@ -252,13 +256,13 @@ export class GuestTableOrderEntryComponent {
       return;
     }
     if (this.payQrSettlementDisabled(order)) {
-      this.payError.set('Paid by QR needs the entered amount to equal the total (no change).');
+      this.payError.set(this.i18n.translate('order.qrExactTotal'));
       return;
     }
     const due = this.payableTotal(order);
     const rawPay = buildPayOrderRequest(due, due);
     if ('error' in rawPay) {
-      this.payError.set(rawPay.error);
+      this.payError.set(this.i18n.translate(rawPay.error));
       return;
     }
     this.submitPayment(order, { ...rawPay, paidByQrScan: true });
@@ -271,13 +275,13 @@ export class GuestTableOrderEntryComponent {
       return;
     }
     if (this.payQrSettlementDisabled(order)) {
-      this.payError.set('Paid by credit needs the entered amount to equal the total (no change).');
+      this.payError.set(this.i18n.translate('order.creditExactTotal'));
       return;
     }
     const due = this.payableTotal(order);
     const rawPay = buildPayOrderRequest(due, due);
     if ('error' in rawPay) {
-      this.payError.set(rawPay.error);
+      this.payError.set(this.i18n.translate(rawPay.error));
       return;
     }
     this.submitPayment(order, { ...rawPay, paidByCredit: true });
@@ -328,21 +332,25 @@ export class GuestTableOrderEntryComponent {
 
   protected lineStatusGuestLabel(order: PosOrder): string {
     return orderHasWaitingLines(order)
-      ? 'Some dishes are still in the kitchen.'
-      : 'Kitchen is up to date with your order.';
+      ? this.i18n.translate('guest.kitchenPending')
+      : this.i18n.translate('guest.kitchenUpToDate');
+  }
+
+  protected lineRowIsCanceled(line: PosOrder['lines'][number], order: PosOrder): boolean {
+    return resolvedLineStatus(line, order) === 'CANCEL';
   }
 
   protected lineRowStatusLabel(line: PosOrder['lines'][number], order: PosOrder): string {
     const s = resolvedLineStatus(line, order);
     switch (s) {
       case 'FINISH_COOKING':
-        return 'Ready';
+        return this.i18n.translate('guest.statusReady');
       case 'COMPLETE':
-        return 'Done';
+        return this.i18n.translate('guest.statusDone');
       case 'CANCEL':
-        return 'Canceled';
+        return this.i18n.translate('guest.statusCanceled');
       default:
-        return 'Preparing';
+        return this.i18n.translate('guest.statusPreparing');
     }
   }
 
@@ -431,7 +439,7 @@ export class GuestTableOrderEntryComponent {
       },
       error: () => {
         this.resolving.set(false);
-        this.error.set('Could not reach the POS. Try again.');
+        this.error.set(this.i18n.translate('guest.couldNotReachPos'));
       },
     });
   }
@@ -499,7 +507,7 @@ export class GuestTableOrderEntryComponent {
   private submitPayment(order: PosOrder, payBody: PayOrderRequest): void {
     const ctx = this.routeTableContext();
     if (order.id == null || order.table?.id == null || ctx == null) {
-      this.payError.set('This bill cannot be paid from this phone.');
+      this.payError.set(this.i18n.translate('guest.cannotPayFromPhone'));
       return;
     }
     const id = order.id;
@@ -541,7 +549,7 @@ export class GuestTableOrderEntryComponent {
         error: (err: unknown) => {
           const message = this.extractErrorMessage(
             err,
-            'Payment did not complete. Ask staff if you were charged.',
+            this.i18n.translate('guest.paymentFailed'),
           );
           this.payError.set(message);
           this.payNoteError.set(message);
@@ -562,7 +570,7 @@ export class GuestTableOrderEntryComponent {
         return err.error;
       }
       if (err.status >= 400) {
-        return `Request failed (HTTP ${err.status})`;
+        return this.i18n.translate('common.requestFailedHttp', { status: err.status });
       }
     }
     if (err instanceof Error && err.message.trim().length > 0) {

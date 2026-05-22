@@ -1,30 +1,28 @@
 <div class="order-list-page">
-  <h1>Orders</h1>
-  <p class="hint">
-    Search by order number. Paid orders should show cash received when the server stores it for reporting.
-  </p>
+  <h1>{{ 'order.title' | t }}</h1>
+  <p class="hint">{{ 'order.hint' | t }}</p>
 
   @if (createdId(); as cid) {
     <p class="success-banner">
-      Order <span class="mono">#{{ cid }}</span> was created.
-      <a routerLink="/orders">Dismiss</a>
+      {{ 'common.createdBanner' | t:{ entity: ('order.entity' | t), id: cid } }}
+      <a routerLink="/orders">{{ 'common.dismiss' | t }}</a>
     </p>
   }
   @if (updatedId(); as uid) {
     <p class="success-banner success-banner--muted">
-      Order <span class="mono">#{{ uid }}</span> was updated.
-      <a routerLink="/orders">Dismiss</a>
+      {{ 'common.updatedBanner' | t:{ entity: ('order.entity' | t), id: uid } }}
+      <a routerLink="/orders">{{ 'common.dismiss' | t }}</a>
     </p>
   }
 
   <div class="toolbar">
     <div class="search-field">
-      <label class="label-text" for="order-search">Search</label>
+      <label class="label-text" for="order-search">{{ 'common.search' | t }}</label>
       <input
         id="order-search"
         type="search"
         autocomplete="off"
-        placeholder="Order number contains…"
+        [placeholder]="'order.searchPlaceholder' | t"
         [value]="searchTerm()"
         (input)="onSearchInput($any($event.target).value)"
       />
@@ -35,12 +33,12 @@
         [checked]="showOnlyNotDone()"
         (change)="onShowOnlyNotDone($any($event.target).checked)"
       />
-      Show only not done
+      {{ 'order.showNotDone' | t }}
     </label>
     @if (loading()) {
-      <span class="status" aria-live="polite">Loading…</span>
+      <span class="status" aria-live="polite">{{ 'common.loading' | t }}</span>
     }
-    <a routerLink="/orders/new" class="add-link">New order</a>
+    <a routerLink="/orders/new" class="add-link">{{ 'order.newOrder' | t }}</a>
   </div>
 
   @if (error(); as err) {
@@ -63,25 +61,25 @@
     <table>
       <thead>
         <tr>
-          <th>ID</th>
-          <th>Order no.</th>
-          <th>Table</th>
-          <th>Lines</th>
-          <th>Order date</th>
-          <th>Done</th>
-          <th>Cancel</th>
-          <th>Paid</th>
-          <th>Payment</th>
-          <th>Order note</th>
-          <th title="Cash tendered (paidPrice)—for reporting">Rec’d</th>
-          <th>Total/Pay</th>
-          <th class="col-actions">Actions</th>
+          <th>{{ 'common.id' | t }}</th>
+          <th>{{ 'order.orderNo' | t }}</th>
+          <th>{{ 'common.table' | t }}</th>
+          <th>{{ 'common.lines' | t }}</th>
+          <th>{{ 'common.orderDate' | t }}</th>
+          <th>{{ 'common.done' | t }}</th>
+          <th>{{ 'common.cancelled' | t }}</th>
+          <th>{{ 'common.paid' | t }}</th>
+          <th>{{ 'common.payment' | t }}</th>
+          <th>{{ 'order.orderNote' | t }}</th>
+          <th [title]="'order.receivedTooltip' | t">{{ 'order.received' | t }}</th>
+          <th>{{ 'order.totalPay' | t }}</th>
+          <th class="col-actions">{{ 'common.actions' | t }}</th>
         </tr>
       </thead>
       <tbody>
         @if (loading() && orders().length === 0) {
           <tr>
-            <td class="empty" colspan="13">Loading…</td>
+            <td class="empty" colspan="13">{{ 'common.loading' | t }}</td>
           </tr>
         }
         @for (o of pagedOrders(); track o.id ?? $index) {
@@ -101,37 +99,37 @@
                   📋 {{ o.lines.length }}
                 </button>
               } @else {
-                —
+                {{ 'common.emptyDash' | t }}
               }
             </td>
             <td>{{ o.orderDate | date: 'short' }}</td>
-            <td>{{ o.complateOrder ? 'Yes' : 'No' }}</td>
-            <td>{{ o.cancel ? 'Yes' : 'No' }}</td>
-            <td>{{ o.paid ? 'Yes' : 'No' }}</td>
+            <td>{{ o.complateOrder ? ('common.yes' | t) : ('common.no' | t) }}</td>
+            <td>{{ o.cancel ? ('common.yes' | t) : ('common.no' | t) }}</td>
+            <td>{{ o.paid ? ('common.yes' | t) : ('common.no' | t) }}</td>
             <td>
               @if (o.paid) {
                 @if (readOrderPaidByQrScan(o)) {
-                  <span class="pay-kind pay-kind-qr">QR</span>
+                  <span class="pay-kind pay-kind-qr">{{ 'order.paymentQr' | t }}</span>
                 } @else if (readOrderPaidByCredit(o)) {
-                  <span class="pay-kind pay-kind-credit">Credit</span>
+                  <span class="pay-kind pay-kind-credit">{{ 'order.paymentCredit' | t }}</span>
                 } @else {
-                  <span class="pay-kind pay-kind-cash">Cash</span>
+                  <span class="pay-kind pay-kind-cash">{{ 'order.paymentCash' | t }}</span>
                 }
               } @else {
-                —
+                {{ 'common.emptyDash' | t }}
               }
             </td>
             <td class="order-list-order-note" [attr.title]="readPosOrderNote(o)">
-              {{ readPosOrderNote(o) ?? '—' }}
+              {{ readPosOrderNote(o) ?? ('common.emptyDash' | t) }}
             </td>
             <td class="mono" title="paidPrice from API (cash received)">
               @if (amountReceived(o); as rec) {
                 {{ rec | number: '1.2-2' }}
               } @else {
-                —
+                {{ 'common.emptyDash' | t }}
               }
             </td>
-            <td class="mono" [attr.title]="'Line total / payable (exclude canceled)'">
+            <td class="mono" [attr.title]="'order.totalPayTooltip' | t">
               {{ orderTotal(o) | number: '1.0-2' }}/<span class="payable-value">{{
                 payableTotal(o) | number: '1.0-2'
               }}</span>
@@ -146,30 +144,30 @@
                       [disabled]="payingId() === o.id"
                       (click)="openPayDialog(o)"
                     >
-                      {{ payingId() === o.id ? 'Paying…' : 'Pay' }}
+                      {{ payingId() === o.id ? ('order.paying' | t) : ('order.pay' | t) }}
                     </button>
                     <button
                       type="button"
                       class="customer-display-inline-btn"
-                      title="Total + PromptPay for the customer (new tab)"
+                      [title]="'order.customerScreenTooltip' | t"
                       [disabled]="o.id == null"
                       (click)="openCustomerDisplayPage(o.id)"
                     >
-                      Customer screen
+                      {{ 'table.customerScreen' | t }}
                     </button>
                     @if (o.lines.length > 0) {
                       <button
                         type="button"
                         class="complete-all-btn"
-                        title="Mark all non-canceled lines complete"
+                        [title]="'order.completeAllTooltip' | t"
                         [disabled]="!hasWaitingLines(o) || isCompleteAllUpdating(o.id)"
                         (click)="completeAllLineStatuses(o)"
                       >
-                        {{ isCompleteAllUpdating(o.id) ? '…' : 'Complete all' }}
+                        {{ isCompleteAllUpdating(o.id) ? '…' : ('order.completeAll' | t) }}
                       </button>
                     }
                     <button type="button" class="open-add-line-btn" (click)="openLinePickerForOrder(o)">
-                      ＋ Line
+                      {{ 'order.addLine' | t }}
                     </button>
                   }
                 </div>
@@ -181,16 +179,16 @@
               <td colspan="13">
                 <div class="line-details">
                   <div class="line-details-header">
-                    <div class="line-details-title">Order lines</div>
+                    <div class="line-details-title">{{ 'order.orderLines' | t }}</div>
                   </div>
                   <table class="line-details-table">
                     <thead>
                       <tr>
-                        <th>Food</th>
-                        <th>Qty</th>
-                        <th>Unit Price</th>
-                        <th>Kitchen note</th>
-                        <th>Status</th>
+                        <th>{{ 'order.food' | t }}</th>
+                        <th>{{ 'common.qty' | t }}</th>
+                        <th>{{ 'order.unitPrice' | t }}</th>
+                        <th>{{ 'order.kitchenNote' | t }}</th>
+                        <th>{{ 'order.status' | t }}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -200,16 +198,16 @@
                             <button
                               type="button"
                               class="complete-all-btn complete-all-btn--in-table"
-                              title="Mark every line complete (canceled lines stay canceled)"
+                              [title]="'order.completeAllLinesTooltip' | t"
                               [disabled]="!hasWaitingLines(o) || isCompleteAllUpdating(o.id)"
                               (click)="completeAllLineStatuses(o)"
                             >
                               {{
                                 isCompleteAllUpdating(o.id)
-                                  ? 'Updating…'
+                                  ? ('order.updating' | t)
                                   : hasWaitingLines(o)
-                                    ? 'Complete all'
-                                    : 'All lines done / canceled'
+                                    ? ('order.completeAll' | t)
+                                    : ('order.allLinesDone' | t)
                               }}
                             </button>
                           </td>
@@ -224,7 +222,7 @@
                             @if (lineKitchenNote(ln); as kn) {
                               {{ kn }}
                             } @else {
-                              —
+                              {{ 'common.emptyDash' | t }}
                             }
                           </td>
                           <td>
@@ -244,8 +242,8 @@
                               <button
                                 type="button"
                                 class="icon-status-btn complete"
-                                title="Set line complete"
-                                aria-label="Set line complete"
+                                [title]="'order.setLineComplete' | t"
+                                [attr.aria-label]="'order.setLineComplete' | t"
                                 [disabled]="o.id == null || isLineStatusUpdating(o.id, i) || lineStatus(ln, o) === 'COMPLETE'"
                                 (click)="changeLineStatus(o, i, 'COMPLETE')"
                               >
@@ -254,8 +252,8 @@
                               <button
                                 type="button"
                                 class="icon-status-btn cancel"
-                                title="Set line cancel"
-                                aria-label="Set line cancel"
+                                [title]="'order.setLineCancel' | t"
+                                [attr.aria-label]="'order.setLineCancel' | t"
                                 [disabled]="o.id == null || isLineStatusUpdating(o.id, i) || lineStatus(ln, o) === 'CANCEL'"
                                 (click)="changeLineStatus(o, i, 'CANCEL')"
                               >
@@ -267,7 +265,7 @@
                         </tr>
                       } @empty {
                         <tr>
-                          <td colspan="5" class="empty">No lines.</td>
+                          <td colspan="5" class="empty">{{ 'order.noLines' | t }}</td>
                         </tr>
                       }
                     </tbody>
@@ -281,11 +279,11 @@
             <tr>
               <td class="empty" colspan="13">
                 @if (orders().length === 0) {
-                  No orders found.
+                  {{ 'order.noOrders' | t }}
                 } @else if (showOnlyNotDone()) {
-                  No orders with Done = No (everything is marked Done for this search).
+                  {{ 'order.noNotDone' | t }}
                 } @else {
-                  No orders on this page.
+                  {{ 'order.noOrdersPage' | t }}
                 }
               </td>
             </tr>
@@ -296,13 +294,13 @@
   </div>
 
   @if (totalOrders() > 0) {
-    <div class="pager" role="navigation" aria-label="Pagination">
+    <div class="pager" role="navigation" [attr.aria-label]="'common.pagination' | t">
       <span class="pager-summary">{{ pagerRangeLabel() }}</span>
       <span class="pager-meta">
-        Page <span class="mono">{{ pageIndex() + 1 }}</span> / <span class="mono">{{ pageCount() }}</span>
+        {{ 'common.pageOf' | t:{ page: pageIndex() + 1, total: pageCount() } }}
       </span>
       <label class="pager-size">
-        Rows per page
+        {{ 'common.rowsPerPage' | t }}
         <select [value]="pageSize()" (change)="setPageSize(+$any($event.target).value)">
           @for (sz of pageSizeOptions; track sz) {
             <option [value]="sz">{{ sz }}</option>
@@ -316,7 +314,7 @@
           [disabled]="pageIndex() <= 0"
           (click)="goPrevPage()"
         >
-          Previous
+          {{ 'common.previous' | t }}
         </button>
         <button
           type="button"
@@ -324,7 +322,7 @@
           [disabled]="pageIndex() >= pageCount() - 1"
           (click)="goNextPage()"
         >
-          Next
+          {{ 'common.next' | t }}
         </button>
       </div>
     </div>
@@ -333,9 +331,9 @@
   @if (payDialogOrder(); as po) {
     <div class="dialog-backdrop" (click)="closePayDialog()">
       <div class="pay-dialog" (click)="$event.stopPropagation()">
-        <h3>Settle payment</h3>
+        <h3>{{ 'order.settlePayment' | t }}</h3>
         <p class="dialog-order-no">
-          Order: <span class="mono">{{ po.orderNo }}</span>
+          {{ 'common.order' | t }}: <span class="mono">{{ po.orderNo }}</span>
         </p>
         <p class="pay-dialog-customer">
           <button
@@ -344,16 +342,16 @@
             [disabled]="payingId() === po.id"
             (click)="openCustomerDisplayPage(po.id)"
           >
-            Customer screen (new tab)
+            {{ 'table.customerScreenNewTab' | t }}
           </button>
         </p>
         <p class="pay-total">
-          Total to pay (ignore canceled lines):
+          {{ 'order.totalToPay' | t }}
           <span class="mono">{{ payableTotal(po) | number: '1.2-2' }}</span>
         </p>
         <app-promptpay-qr-display [amountBaht]="payableTotal(po)" />
         <div class="pay-dialog-order-note">
-          <span class="pay-dialog-order-note-label">Order note</span>
+          <span class="pay-dialog-order-note-label">{{ 'order.orderNote' | t }}</span>
           @if (payDialogNoteError(); as ne) {
             <p class="pay-dialog-note-error" role="alert">{{ ne }}</p>
           }
@@ -369,7 +367,7 @@
             (ngModelChange)="payDialogNoteDraft.set($event)"
           ></textarea>
         </div>
-        <label class="pay-input-label" for="pay-input-amount">Input total to pay</label>
+        <label class="pay-input-label" for="pay-input-amount">{{ 'order.inputTotal' | t }}</label>
         <input
           #payAmountInput
           id="pay-input-amount"
@@ -386,12 +384,9 @@
         @let change = payDialogChange(po);
         @if (change > 0) {
           <p class="pay-change">
-            Change: <span class="mono">{{ change | number: '1.2-2' }}</span>
+            {{ 'common.change' | t }}: <span class="mono">{{ change | number: '1.2-2' }}</span>
           </p>
-          <p class="pay-qr-gate">
-            Paid by QR or credit is off while there is cash change — set the amount to the
-            <strong>exact</strong> total to use those methods.
-          </p>
+          <p class="pay-qr-gate">{{ 'order.qrCreditBlocked' | t }}</p>
         }
         <div class="dialog-actions">
           <button
@@ -400,27 +395,27 @@
             [disabled]="payingId() === po.id || +payInputAmount() < 0 || payInputAmount().trim() === ''"
             (click)="confirmPayFromDialog()"
           >
-            {{ payingId() === po.id ? 'Paying…' : 'Paid by cash' }}
+            {{ payingId() === po.id ? ('order.paying' | t) : ('order.paidByCash' | t) }}
           </button>
           <button
             type="button"
             class="pay-btn pay-btn-qr"
-            title="Requires exact total (no change); PromptPay / bank QR settles the amount due."
+            [title]="'order.exactTotalQr' | t"
             [disabled]="payQrSettlementDisabled(po)"
             (click)="confirmPayQrFromDialog()"
           >
-            {{ payingId() === po.id ? 'Paying…' : 'Paid by QR' }}
+            {{ payingId() === po.id ? ('order.paying' | t) : ('order.paidByQr' | t) }}
           </button>
           <button
             type="button"
             class="pay-btn pay-btn-credit"
-            title="Requires exact total (no change); records settlement as card/credit."
+            [title]="'order.exactTotalCredit' | t"
             [disabled]="payQrSettlementDisabled(po)"
             (click)="confirmPayCreditFromDialog()"
           >
-            {{ payingId() === po.id ? 'Paying…' : 'Credit' }}
+            {{ payingId() === po.id ? ('order.paying' | t) : ('order.credit' | t) }}
           </button>
-          <button type="button" class="dialog-cancel-btn" (click)="closePayDialog()">Close</button>
+          <button type="button" class="dialog-cancel-btn" (click)="closePayDialog()">{{ 'common.close' | t }}</button>
         </div>
       </div>
     </div>

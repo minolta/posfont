@@ -35,9 +35,10 @@ import { mergeFoodsFromApis, mergeTablesFromApis, foodPickerLabel, tablePickerLa
 import type { OrderLine, OrderLineStatus, OrderRequest, PatchOrderNoteRequest, PosOrder } from './order.model';
 import { lineKitchenNote, trimNewLineNote } from './order-line-note.util';
 import { resolvedLineStatus } from './order-line-status.util';
+import { LocaleService } from '../i18n/locale.service';
+import { TranslatePipe } from '../i18n/translate.pipe';
 import {
   mergeOrderRequestPaymentFromPosOrder,
-  orderPaymentMethodLabel,
   readPosOrderChange,
   readPosOrderNote,
   readPosOrderPaidPrice,
@@ -47,7 +48,7 @@ import { OrderService } from './order.service';
 @Component({
   selector: 'app-order-edit',
   standalone: true,
-  imports: [DecimalPipe, FormsModule, ReactiveFormsModule, RouterLink],
+  imports: [DecimalPipe, FormsModule, ReactiveFormsModule, RouterLink, TranslatePipe],
   templateUrl: './order-edit.component.html',
   styleUrl: './order-edit.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -59,6 +60,7 @@ export class OrderEditComponent {
   private readonly orderService = inject(OrderService);
   private readonly tableService = inject(TableService);
   private readonly foodService = inject(FoodService);
+  private readonly i18n = inject(LocaleService);
 
   readonly loading = signal(true);
   readonly loadError = signal<string | null>(null);
@@ -127,7 +129,7 @@ export class OrderEditComponent {
         switchMap((id) => {
           if (!Number.isFinite(id) || id < 1) {
             this.loading.set(false);
-            this.loadError.set('Invalid order id.');
+            this.loadError.set(this.i18n.translate('common.invalidId', { entity: this.i18n.translate('order.entity') }));
             this.orderId.set(null);
             this.orderPaid.set(false);
             this.paidView.set(null);
@@ -144,7 +146,9 @@ export class OrderEditComponent {
           return forkJoin({
             order: this.orderService.getOrderById(id).pipe(
               catchError(() => {
-                this.loadError.set('Could not load order.');
+                this.loadError.set(
+                  this.i18n.translate('common.couldNotLoad', { entity: this.i18n.translate('order.entity') }),
+                );
                 return of(undefined as PosOrder | undefined);
               }),
             ),
@@ -167,7 +171,7 @@ export class OrderEditComponent {
         this.foods.set(foods);
         if (!order) {
           if (!this.loadError()) {
-            this.loadError.set('Order not found.');
+            this.loadError.set(this.i18n.translate('common.notFound', { entity: this.i18n.translate('order.entity') }));
           }
           this.orderPaid.set(false);
           this.paidView.set(null);
@@ -225,14 +229,14 @@ export class OrderEditComponent {
 
   tableCell(t: PosTable | null | undefined): string {
     if (!t) {
-      return '—';
+      return this.i18n.translate('common.emptyDash');
     }
     return tablePickerLabel(t);
   }
 
   foodLabel(f: Food | null | undefined): string {
     if (!f) {
-      return '—';
+      return this.i18n.translate('common.emptyDash');
     }
     return foodPickerLabel(f);
   }
@@ -240,7 +244,7 @@ export class OrderEditComponent {
   linesSummary(o: PosOrder): string {
     const lines = o.lines ?? [];
     if (lines.length === 0) {
-      return '—';
+      return this.i18n.translate('common.emptyDash');
     }
     return lines
       .map((ln) => {
@@ -271,7 +275,7 @@ export class OrderEditComponent {
 
   /** How the order was settled when paid (cash, QR, or credit). */
   paidSettlementLabel(o: PosOrder): string {
-    return orderPaymentMethodLabel(o);
+    return this.i18n.orderPaymentMethodLabel(o);
   }
 
   /** Stored change from API, or paid price minus line total when paid price is known. */
@@ -293,7 +297,7 @@ export class OrderEditComponent {
 
   formatDateShort(value: string | null | undefined): string {
     if (!value?.trim()) {
-      return '—';
+      return this.i18n.translate('common.emptyDash');
     }
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) {
@@ -450,7 +454,7 @@ export class OrderEditComponent {
           const ver = Number(current.version);
           if (!Number.isFinite(ver) || ver < 0) {
             return throwError(
-              () => new Error('Order version is missing. Reload the page and try again.'),
+              () => new Error(this.i18n.translate('order.versionMissing')),
             );
           }
           const body: PatchOrderNoteRequest = { note, version: ver };
@@ -482,11 +486,11 @@ export class OrderEditComponent {
       if (typeof err.error === 'string' && err.error.length > 0) {
         return err.error;
       }
-      return err.message || `Request failed (${err.status})`;
+      return err.message || this.i18n.translate('common.requestFailedHttp', { status: err.status });
     }
     if (err instanceof Error && err.message) {
       return err.message;
     }
-    return 'Could not save order.';
+    return this.i18n.translate('order.couldNotSave');
   }
 }

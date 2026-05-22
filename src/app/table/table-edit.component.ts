@@ -5,6 +5,8 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { EMPTY, catchError, finalize, forkJoin, map, of, switchMap } from 'rxjs';
 
+import { LocaleService } from '../i18n/locale.service';
+import { TranslatePipe } from '../i18n/translate.pipe';
 import type { Zone } from '../zone/zone.model';
 import { ZoneService } from '../zone/zone.service';
 import type { PosTable, TableRequest } from './table.model';
@@ -13,7 +15,7 @@ import { TableService } from './table.service';
 @Component({
   selector: 'app-table-edit',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, TranslatePipe],
   templateUrl: './table-edit.component.html',
   styleUrl: './table-edit.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -24,6 +26,7 @@ export class TableEditComponent {
   private readonly router = inject(Router);
   private readonly tableService = inject(TableService);
   private readonly zoneService = inject(ZoneService);
+  private readonly i18n = inject(LocaleService);
 
   readonly loading = signal(true);
   readonly loadError = signal<string | null>(null);
@@ -50,7 +53,11 @@ export class TableEditComponent {
         switchMap((id) => {
           if (!Number.isFinite(id) || id < 1) {
             this.loading.set(false);
-            this.loadError.set('Invalid table id.');
+            this.loadError.set(
+              this.i18n.translate('common.invalidId', {
+                entity: this.i18n.translate('table.entity'),
+              }),
+            );
             this.tableId.set(null);
             return EMPTY;
           }
@@ -60,7 +67,11 @@ export class TableEditComponent {
           return forkJoin({
             table: this.tableService.getTableById(id).pipe(
               catchError(() => {
-                this.loadError.set('Could not load table.');
+                this.loadError.set(
+                  this.i18n.translate('common.couldNotLoad', {
+                    entity: this.i18n.translate('table.entity'),
+                  }),
+                );
                 return of(undefined as PosTable | undefined);
               }),
             ),
@@ -90,7 +101,11 @@ export class TableEditComponent {
         this.zones.set(zones);
         if (!table) {
           if (!this.loadError()) {
-            this.loadError.set('Table not found.');
+            this.loadError.set(
+              this.i18n.translate('common.notFound', {
+                entity: this.i18n.translate('table.entity'),
+              }),
+            );
           }
           return;
         }
@@ -195,9 +210,14 @@ export class TableEditComponent {
       if (typeof err.error === 'string' && err.error.length > 0) {
         return err.error;
       }
-      return err.message || `Request failed (${err.status})`;
+      return (
+        err.message ||
+        this.i18n.translate('common.requestFailedHttp', { status: err.status })
+      );
     }
-    return 'Could not save table.';
+    return this.i18n.translate('common.couldNotSave', {
+      entity: this.i18n.translate('table.entity'),
+    });
   }
 }
 

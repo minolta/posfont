@@ -10,6 +10,7 @@ import {
 
 import { DecimalPipe } from '@angular/common';
 
+import { TranslatePipe } from '../i18n/translate.pipe';
 import { PromptPayQrService } from './prompt-pay-qr.service';
 import { PROMPTPAY_RECEIVER_ID } from './promptpay-receiver.token';
 
@@ -17,7 +18,7 @@ import { PROMPTPAY_RECEIVER_ID } from './promptpay-receiver.token';
 @Component({
   selector: 'app-promptpay-qr-display',
   standalone: true,
-  imports: [DecimalPipe],
+  imports: [DecimalPipe, TranslatePipe],
   templateUrl: './promptpay-qr-display.component.html',
   styleUrl: './promptpay-qr-display.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

@@ -5,13 +5,15 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { EMPTY, catchError, finalize, map, switchMap } from 'rxjs';
 
+import { LocaleService } from '../i18n/locale.service';
+import { TranslatePipe } from '../i18n/translate.pipe';
 import type { Zone, ZoneRequest } from './zone.model';
 import { ZoneService } from './zone.service';
 
 @Component({
   selector: 'app-zone-edit',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, TranslatePipe],
   templateUrl: './zone-edit.component.html',
   styleUrl: './zone-edit.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -21,6 +23,7 @@ export class ZoneEditComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly zoneService = inject(ZoneService);
+  private readonly i18n = inject(LocaleService);
 
   readonly loading = signal(true);
   readonly loadError = signal<string | null>(null);
@@ -48,7 +51,11 @@ export class ZoneEditComponent {
         switchMap((id) => {
           if (!Number.isFinite(id) || id < 1) {
             this.loading.set(false);
-            this.loadError.set('Invalid zone id.');
+            this.loadError.set(
+              this.i18n.translate('common.invalidId', {
+                entity: this.i18n.translate('zone.entity'),
+              }),
+            );
             this.zoneId.set(null);
             this.loadedZone.set(null);
             return EMPTY;
@@ -58,7 +65,11 @@ export class ZoneEditComponent {
           this.loadError.set(null);
           return this.zoneService.getZoneById(id).pipe(
             catchError(() => {
-              this.loadError.set('Could not load zone.');
+              this.loadError.set(
+                this.i18n.translate('common.couldNotLoad', {
+                  entity: this.i18n.translate('zone.entity'),
+                }),
+              );
               return EMPTY;
             }),
             finalize(() => this.loading.set(false)),
@@ -68,7 +79,11 @@ export class ZoneEditComponent {
       )
       .subscribe((zone) => {
         if (!zone) {
-          this.loadError.set('Zone not found.');
+          this.loadError.set(
+            this.i18n.translate('common.notFound', {
+              entity: this.i18n.translate('zone.entity'),
+            }),
+          );
           this.loadedZone.set(null);
           return;
         }
@@ -184,8 +199,13 @@ export class ZoneEditComponent {
       if (typeof err.error === 'string' && err.error.length > 0) {
         return err.error;
       }
-      return err.message || `Request failed (${err.status})`;
+      return (
+        err.message ||
+        this.i18n.translate('common.requestFailedHttp', { status: err.status })
+      );
     }
-    return 'Could not save zone.';
+    return this.i18n.translate('common.couldNotSave', {
+      entity: this.i18n.translate('zone.entity'),
+    });
   }
 }

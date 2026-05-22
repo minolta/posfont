@@ -1,36 +1,36 @@
 <div class="kitchen-list-page">
-  <h1>Kitchens</h1>
-  <p class="hint">Search matches kitchen code.</p>
+  <h1>{{ 'kitchen.title' | t }}</h1>
+  <p class="hint">{{ 'kitchen.hint' | t }}</p>
 
   @if (createdId(); as cid) {
     <p class="success-banner">
-      Kitchen <span class="mono">#{{ cid }}</span> was created.
-      <a routerLink="/kitchens">Dismiss</a>
+      {{ 'common.createdBanner' | t:{ entity: ('kitchen.entity' | t), id: cid } }}
+      <a routerLink="/kitchens">{{ 'common.dismiss' | t }}</a>
     </p>
   }
   @if (updatedId(); as uid) {
     <p class="success-banner success-banner--muted">
-      Kitchen <span class="mono">#{{ uid }}</span> was updated.
-      <a routerLink="/kitchens">Dismiss</a>
+      {{ 'common.updatedBanner' | t:{ entity: ('kitchen.entity' | t), id: uid } }}
+      <a routerLink="/kitchens">{{ 'common.dismiss' | t }}</a>
     </p>
   }
 
   <div class="toolbar">
     <div class="search-field">
-      <label class="label-text" for="kitchen-search">Search</label>
+      <label class="label-text" for="kitchen-search">{{ 'common.search' | t }}</label>
       <input
         id="kitchen-search"
         type="search"
         autocomplete="off"
-        placeholder="Code contains…"
+        [placeholder]="'kitchen.searchPlaceholder' | t"
         [value]="searchTerm()"
         (input)="onSearchInput($any($event.target).value)"
       />
     </div>
     @if (loading()) {
-      <span class="status" aria-live="polite">Loading…</span>
+      <span class="status" aria-live="polite">{{ 'common.loading' | t }}</span>
     }
-    <a routerLink="/kitchens/new" class="add-link">Add kitchen</a>
+    <a routerLink="/kitchens/new" class="add-link">{{ 'kitchen.addKitchen' | t }}</a>
   </div>
 
   @if (error(); as err) {
@@ -41,17 +41,17 @@
     <table>
       <thead>
         <tr>
-          <th>ID</th>
-          <th>Code</th>
-          <th>Name</th>
-          <th>Ver.</th>
-          <th class="col-actions">Actions</th>
+          <th>{{ 'common.id' | t }}</th>
+          <th>{{ 'common.code' | t }}</th>
+          <th>{{ 'common.name' | t }}</th>
+          <th>{{ 'common.version' | t }}</th>
+          <th class="col-actions">{{ 'common.actions' | t }}</th>
         </tr>
       </thead>
       <tbody>
         @if (loading() && kitchens().length === 0) {
           <tr>
-            <td class="empty" colspan="5">Loading…</td>
+            <td class="empty" colspan="5">{{ 'common.loading' | t }}</td>
           </tr>
         }
         @for (k of kitchens(); track k.id ?? $index) {
@@ -62,14 +62,14 @@
             <td class="mono">{{ k.version }}</td>
             <td class="col-actions">
               @if (k.id != null) {
-                <a [routerLink]="['/kitchens', k.id, 'edit']" class="edit-link">Edit</a>
+                <a [routerLink]="['/kitchens', k.id, 'edit']" class="edit-link">{{ 'common.edit' | t }}</a>
               }
             </td>
           </tr>
         } @empty {
           @if (!loading()) {
             <tr>
-              <td class="empty" colspan="5">No kitchens found.</td>
+              <td class="empty" colspan="5">{{ 'common.noResults' | t:{ entity: ('kitchen.title' | t) } }}</td>
             </tr>
           }
         }

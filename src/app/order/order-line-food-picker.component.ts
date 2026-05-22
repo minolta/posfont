@@ -6,12 +6,13 @@ import { catchError, map, of } from 'rxjs';
 
 import { foodBlocksOrderLines, type Food } from '../food/food.model';
 import { FoodService } from '../food/food.service';
+import { TranslatePipe } from '../i18n/translate.pipe';
 import { foodPickerLabel } from './order-merge.util';
 
 @Component({
   selector: 'app-order-line-food-picker',
   standalone: true,
-  imports: [DecimalPipe, RouterLink],
+  imports: [DecimalPipe, RouterLink, TranslatePipe],
   templateUrl: './order-line-food-picker.component.html',
   styleUrl: './order-line-food-picker.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

@@ -9,6 +9,9 @@ export interface BackupExportResponse {
   filePath?: string;
   bytes: number;
   message?: string;
+  ordersExported: number;
+  ordersFromDate?: string | null;
+  ordersToDate?: string | null;
 }
 
 export interface BackupImportResponse {
@@ -27,12 +30,27 @@ export class BackupService {
   private readonly http = inject(HttpClient);
   private readonly rootUrl = `${inject(POS_API_BASE_URL)}/api/backup`;
 
-  /** `POST /api/backup/export` — writes JSON under server `app.backup-dir`. */
-  exportAllRecords(): Observable<BackupExportResponse> {
-    return this.http.post<BackupExportResponse>(`${this.rootUrl}/export`, {});
+  /**
+   * `POST /api/backup/export` — ZIP with full master data + orders filtered by calendar `order_date` when bounds set.
+   * Dates are inclusive local days (`yyyy-MM-dd`).
+   */
+  exportAllRecords(
+    ordersFromDate?: string,
+    ordersToDate?: string,
+  ): Observable<BackupExportResponse> {
+    let params = new HttpParams();
+    const from = ordersFromDate?.trim();
+    const to = ordersToDate?.trim();
+    if (from) {
+      params = params.set('ordersFromDate', from);
+    }
+    if (to) {
+      params = params.set('ordersToDate', to);
+    }
+    return this.http.post<BackupExportResponse>(`${this.rootUrl}/export`, {}, { params });
   }
 
-  /** `GET /api/backup/download?fileName=` — attachment JSON from last export (or known name). */
+  /** `GET /api/backup/download?fileName=` — ZIP attachment (`application/zip`; legacy `.json` still OK). */
   downloadFile(fileName: string): Observable<Blob> {
     const params = new HttpParams().set('fileName', fileName);
     return this.http.get(`${this.rootUrl}/download`, {
@@ -42,7 +60,7 @@ export class BackupService {
   }
 
   /**
-   * `POST /api/backup/import?confirm=true` — multipart `file`; replaces all POS data with backup JSON.
+   * `POST /api/backup/import?confirm=true` — multipart `file`; `.zip` (export) or raw `.json`.
    */
   importBackupFile(file: File): Observable<BackupImportResponse> {
     const body = new FormData();

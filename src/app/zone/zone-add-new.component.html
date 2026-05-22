@@ -1,9 +1,7 @@
 <div class="page">
-  <a routerLink="/zones" class="back">← Back to zones</a>
-  <h1>Add zone</h1>
-  <p class="hint">
-    Saves the zone then uploads your photo (JPEG, PNG, GIF, or WebP). If the upload fails, the new row is discarded.
-  </p>
+  <a routerLink="/zones" class="back">{{ 'common.backTo' | t:{ target: ('zone.backZones' | t) } }}</a>
+  <h1>{{ 'zone.addTitle' | t }}</h1>
+  <p class="hint">{{ 'zone.addHint' | t }}</p>
 
   @if (errorMessage(); as msg) {
     <p class="error-banner" role="alert">{{ msg }}</p>
@@ -11,23 +9,23 @@
 
   <form [formGroup]="form" (ngSubmit)="submit()">
     <div class="field" [class.invalid]="form.controls.code.invalid && form.controls.code.touched">
-      <label for="code">Code</label>
-      <input id="code" type="text" formControlName="code" autocomplete="off" placeholder="e.g. DINING-A" />
+      <label for="code">{{ 'common.code' | t }}</label>
+      <input id="code" type="text" formControlName="code" autocomplete="off" [placeholder]="'zone.codeExample' | t" />
       @if (form.controls.code.invalid && form.controls.code.touched) {
-        <span class="err">Code is required.</span>
+        <span class="err">{{ 'common.required' | t:{ field: ('common.code' | t) } }}</span>
       }
     </div>
 
     <div class="field" [class.invalid]="form.controls.name.invalid && form.controls.name.touched">
-      <label for="zone-name">Name</label>
-      <input id="zone-name" type="text" formControlName="name" autocomplete="off" maxlength="255" placeholder="e.g. Main dining" />
+      <label for="zone-name">{{ 'common.name' | t }}</label>
+      <input id="zone-name" type="text" formControlName="name" autocomplete="off" maxlength="255" [placeholder]="'zone.nameExample' | t" />
       @if (form.controls.name.invalid && form.controls.name.touched) {
-        <span class="err">Name is required.</span>
+        <span class="err">{{ 'common.required' | t:{ field: ('common.name' | t) } }}</span>
       }
     </div>
 
     <div class="field" [class.invalid]="pictureRequiredHint() && !pendingPicture()">
-      <label for="zone-picture">Photo <span class="req">(required)</span></label>
+      <label for="zone-picture">{{ 'zone.photo' | t }} <span class="req">{{ 'common.requiredLabel' | t }}</span></label>
       <input
         id="zone-picture"
         type="file"
@@ -35,15 +33,15 @@
         (change)="onPictureSelected($event)"
       />
       @if (pendingPicture(); as pic) {
-        <p class="hint-inline">{{ pic.name }} — <button type="button" class="linkish" (click)="clearPendingPicture()">Remove</button></p>
+        <p class="hint-inline">{{ pic.name }} — <button type="button" class="linkish" (click)="clearPendingPicture()">{{ 'common.remove' | t }}</button></p>
       } @else if (pictureRequiredHint()) {
-        <span class="err">Choose a photo for this zone.</span>
+        <span class="err">{{ 'zone.choosePhoto' | t }}</span>
       }
     </div>
 
     <div class="actions">
       <button type="submit" [disabled]="submitting() || !canSubmit()">
-        {{ submitting() ? 'Saving…' : 'Create zone' }}
+        {{ submitting() ? ('common.saving' | t) : ('zone.createZone' | t) }}
       </button>
     </div>
   </form>

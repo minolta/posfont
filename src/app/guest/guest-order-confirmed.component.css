@@ -11,6 +11,12 @@
   text-align: center;
 }
 
+.guest-lang-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin: -0.25rem 0 1rem;
+}
+
 .guest-done h1 {
   margin: 0 0 0.75rem;
   font-size: 1.35rem;

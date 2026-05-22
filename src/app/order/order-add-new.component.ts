@@ -19,12 +19,14 @@ import { defaultDatetimeLocal, normalizeLocalDateTimeForApi } from './order-date
 import { mergeFoodsFromApis, mergeTablesFromApis, foodPickerLabel, tablePickerLabel } from './order-merge.util';
 import { trimNewLineNote } from './order-line-note.util';
 import type { OrderRequest } from './order.model';
+import { LocaleService } from '../i18n/locale.service';
+import { TranslatePipe } from '../i18n/translate.pipe';
 import { OrderService } from './order.service';
 
 @Component({
   selector: 'app-order-add-new',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, TranslatePipe],
   templateUrl: './order-add-new.component.html',
   styleUrl: './order-add-new.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -38,6 +40,7 @@ export class OrderAddNewComponent {
   private readonly foodService = inject(FoodService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly i18n = inject(LocaleService);
 
   readonly submitting = signal(false);
   readonly errorMessage = signal<string | null>(null);
@@ -270,9 +273,7 @@ export class OrderAddNewComponent {
             (o) => o.table?.id === tableId && !o.paid && !o.cancel,
           );
           if (hasOpenUnpaidOnSameTable) {
-            this.errorMessage.set(
-              'This table already has an unpaid open order. Please pay/cancel it first.',
-            );
+            this.errorMessage.set(this.i18n.translate('order.tableHasOpenOrder'));
             return of(null);
           }
           return this.orderService.createOrder(body);
@@ -433,8 +434,8 @@ export class OrderAddNewComponent {
       if (typeof err.error === 'string' && err.error.length > 0) {
         return err.error;
       }
-      return err.message || `Request failed (${err.status})`;
+      return err.message || this.i18n.translate('common.requestFailedHttp', { status: err.status });
     }
-    return 'Could not create order.';
+    return this.i18n.translate('order.couldNotCreate');
   }
 }

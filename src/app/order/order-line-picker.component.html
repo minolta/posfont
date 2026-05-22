@@ -1,17 +1,17 @@
 <div class="page" [class.page--guest]="from === 'guest'">
   <button type="button" class="back-btn" (click)="backToOrder()">
     @if (from === 'guest') {
-      ← Change table
+      {{ 'order.linePickerBackTable' | t }}
     } @else if (isExistingOrderFlow()) {
-      ← {{ from === 'tables' ? 'Back to tables' : 'Back to orders' }}
+      ← {{ from === 'tables' ? ('order.linePickerBackTables' | t) : ('order.linePickerBackOrders' | t) }}
     } @else {
-      ← Back to new order
+      {{ 'order.linePickerBackNew' | t }}
     }
   </button>
-  <h1>Pick food by picture</h1>
+  <h1>{{ 'order.linePickerTitle' | t }}</h1>
   @if (tableCodeParam) {
     <p class="table-order-banner">
-      Table <span class="mono">{{ tableCodeParam }}</span>
+      {{ 'common.table' | t }} <span class="mono">{{ tableCodeParam }}</span>
     </p>
   }
   @if (guestError(); as ge) {
@@ -22,7 +22,7 @@
     <p class="notice">{{ msg }}</p>
   }
   @if (from !== 'orders') {
-    <p class="pending">Pending lines: <span class="mono">{{ pendingCount() }}</span></p>
+    <p class="pending">{{ 'order.pendingLines' | t }} <span class="mono">{{ pendingCount() }}</span></p>
   }
   @if (pendingCount() > 0) {
     <div class="pending-list">
@@ -43,7 +43,7 @@
   <div class="toolbar">
     <input
       type="search"
-      placeholder="Search food or category..."
+      [placeholder]="'order.searchFoodCategory' | t"
       [value]="search()"
       (input)="search.set($any($event.target).value)"
     />
@@ -54,7 +54,7 @@
       class="qty"
       [value]="qty()"
       (input)="qty.set($any($event.target).value)"
-      title="Quantity for picked line"
+      [title]="'order.qtyForLine' | t"
     />
   </div>
 
@@ -65,7 +65,7 @@
       [class.active]="selectedCategoryKey() === 'ALL'"
       (click)="selectCategory('ALL')"
     >
-      All
+      {{ 'common.all' | t }}
     </button>
     @for (c of categoryButtons(); track c.key) {
       <button
@@ -85,13 +85,13 @@
         @if (pictureSrc(f); as src) {
           <img [src]="src" alt="" />
         } @else {
-          <div class="no-pic">No image</div>
+          <div class="no-pic">{{ 'common.noImage' | t }}</div>
         }
         <div class="name">{{ foodPickerLabel(f) }}</div>
         <div class="price">{{ f.basePrice | number: '1.2-2' }}</div>
       </button>
     } @empty {
-      <p class="empty">No foods found.</p>
+      <p class="empty">{{ 'common.noResults' | t:{ entity: ('order.food' | t) } }}</p>
     }
   </div>
   <div class="confirm-row">
@@ -102,7 +102,7 @@
       (click)="confirmSave()"
     >
       @if (guestSubmitting()) {
-        Sending…
+        {{ 'order.sending' | t }}
       } @else {
         {{ confirmButtonLabel() }}
       }

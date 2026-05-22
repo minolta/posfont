@@ -3,13 +3,15 @@ import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { catchError, distinctUntilChanged, finalize, map, of, switchMap, timer } from 'rxjs';
 
+import { LocaleService } from '../i18n/locale.service';
+import { TranslatePipe } from '../i18n/translate.pipe';
 import type { Kitchen } from './kitchen.model';
 import { KitchenService } from './kitchen.service';
 
 @Component({
   selector: 'app-kitchen-list',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, TranslatePipe],
   templateUrl: './kitchen-list.component.html',
   styleUrl: './kitchen-list.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -17,6 +19,7 @@ import { KitchenService } from './kitchen.service';
 export class KitchenListComponent {
   private readonly kitchenService = inject(KitchenService);
   private readonly route = inject(ActivatedRoute);
+  private readonly i18n = inject(LocaleService);
 
   readonly createdId = toSignal(
     this.route.queryParamMap.pipe(map((p) => p.get('created'))),
@@ -43,7 +46,11 @@ export class KitchenListComponent {
           switchMap(() =>
             this.kitchenService.searchKitchens(trimmed || undefined).pipe(
               catchError(() => {
-                this.error.set('Could not load kitchens. Check that the API is running.');
+                this.error.set(
+                  this.i18n.translate('common.couldNotLoad', {
+                    entity: this.i18n.translate('kitchen.entity'),
+                  }),
+                );
                 return of([] as Kitchen[]);
               }),
               finalize(() => this.loading.set(false)),

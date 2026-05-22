@@ -21,6 +21,8 @@ import {
   timer,
 } from 'rxjs';
 
+import { LocaleService } from '../i18n/locale.service';
+import { TranslatePipe } from '../i18n/translate.pipe';
 import { FoodCategoryService } from '../food-category/food-category.service';
 import {
   foodBlocksOrderLines,
@@ -35,7 +37,7 @@ import { FoodService } from './food.service';
 @Component({
   selector: 'app-food-list',
   standalone: true,
-  imports: [DecimalPipe, RouterLink],
+  imports: [DecimalPipe, RouterLink, TranslatePipe],
   templateUrl: './food-list.component.html',
   styleUrl: './food-list.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -44,6 +46,7 @@ export class FoodListComponent {
   private readonly foodService = inject(FoodService);
   private readonly foodCategoryService = inject(FoodCategoryService);
   private readonly route = inject(ActivatedRoute);
+  private readonly i18n = inject(LocaleService);
 
   /** Food ids whose image URL failed to load (e.g. 404); hide thumb until list refetches. */
   private readonly brokenPictureIds = signal<Set<number>>(new Set());
@@ -93,7 +96,11 @@ export class FoodListComponent {
           switchMap(() =>
             this.foodService.searchFoods(trimmed || undefined).pipe(
               catchError(() => {
-                this.error.set('Could not load foods. Check that the API is running.');
+                this.error.set(
+                  this.i18n.translate('common.couldNotLoad', {
+                    entity: this.i18n.translate('nav.foods'),
+                  }),
+                );
                 return of([] as Food[]);
               }),
               finalize(() => this.loading.set(false)),
@@ -154,7 +161,11 @@ export class FoodListComponent {
     try {
       body = foodUpdateRequestSnapshot(food, { blockOrderLine: blocked });
     } catch {
-      this.blockToggleError.set('Food is missing kitchen or category — use Edit to fix.');
+      this.blockToggleError.set(
+        this.i18n.translate('common.couldNotSave', {
+          entity: this.i18n.translate('food.entity'),
+        }),
+      );
       return;
     }
     this.blockRowSavingId.set(food.id);
@@ -174,7 +185,11 @@ export class FoodListComponent {
       return;
     }
     this.deleteError.set(null);
-    if (!window.confirm(`Delete food "${food.code}"?`)) {
+    if (
+      !window.confirm(
+        `${this.i18n.translate('common.delete')} "${food.code}"?`,
+      )
+    ) {
       return;
     }
     this.deletingId.set(food.id);
@@ -202,33 +217,35 @@ export class FoodListComponent {
         return err.error;
       }
     }
-    return 'Could not delete food. Check API connectivity and dependencies.';
+    return this.i18n.translate('common.couldNotDelete', {
+      entity: this.i18n.translate('food.entity'),
+    });
   }
 
   /** Kitchen column: `Name (code)` when both exist; otherwise name or code. */
   kitchenCell(k: Kitchen | null | undefined): string {
     if (!k) {
-      return '—';
+      return this.i18n.translate('common.emptyDash');
     }
     const name = (k.name ?? '').trim();
     const code = (k.code ?? '').trim();
     if (name && code) {
       return `${name} (${code})`;
     }
-    return name || code || '—';
+    return name || code || this.i18n.translate('common.emptyDash');
   }
 
   /** Category column: `Name (code)` when both exist; otherwise name or code. */
   categoryCell(c: FoodCategory | null | undefined): string {
     if (!c) {
-      return '—';
+      return this.i18n.translate('common.emptyDash');
     }
     const name = (c.name ?? '').trim();
     const code = (c.code ?? '').trim();
     if (name && code) {
       return `${name} (${code})`;
     }
-    return name || code || '—';
+    return name || code || this.i18n.translate('common.emptyDash');
   }
 
   pictureSrc(food: Food): string | null {

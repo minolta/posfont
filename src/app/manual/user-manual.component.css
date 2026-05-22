@@ -1,0 +1,161 @@
+.manual-page {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 1.25rem 1rem 2.5rem;
+  line-height: 1.55;
+  color: #1a1a1a;
+}
+
+.back {
+  display: inline-block;
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.back:hover {
+  text-decoration: underline;
+}
+
+.manual-head h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0 0 0.35rem;
+  letter-spacing: -0.02em;
+}
+
+.hint {
+  margin: 0 0 1.25rem;
+  font-size: 0.85rem;
+  color: #5c5c5c;
+}
+
+.status {
+  color: #4b5563;
+}
+
+.error-banner {
+  padding: 0.65rem 0.85rem;
+  margin: 0 0 1rem;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+  font-size: 0.9rem;
+}
+
+.manual-body :where(h1, h2, h3, h4) {
+  scroll-margin-top: 4rem;
+  line-height: 1.25;
+}
+
+.manual-body h1 {
+  font-size: 1.35rem;
+  margin: 0 0 0.75rem;
+}
+
+.manual-body h2 {
+  font-size: 1.15rem;
+  margin: 1.75rem 0 0.65rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid #e5e5e5;
+}
+
+.manual-body h2:first-child {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0;
+}
+
+.manual-body h3 {
+  font-size: 1rem;
+  margin: 1.15rem 0 0.45rem;
+}
+
+.manual-body h4 {
+  font-size: 0.95rem;
+  margin: 0.85rem 0 0.35rem;
+}
+
+.manual-body p {
+  margin: 0 0 0.75rem;
+  font-size: 0.92rem;
+}
+
+.manual-body ul,
+.manual-body ol {
+  margin: 0 0 0.85rem 1.25rem;
+  padding: 0;
+  font-size: 0.92rem;
+}
+
+.manual-body li {
+  margin: 0.25rem 0;
+}
+
+.manual-body blockquote {
+  margin: 0 0 0.85rem;
+  padding: 0.55rem 0.85rem;
+  border-left: 3px solid #93c5fd;
+  background: #eff6ff;
+  color: #1e3a8a;
+  border-radius: 0 6px 6px 0;
+}
+
+.manual-body blockquote p {
+  margin: 0;
+}
+
+.manual-body hr {
+  border: none;
+  border-top: 1px solid #e5e5e5;
+  margin: 1.25rem 0;
+}
+
+.manual-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 1rem;
+  font-size: 0.88rem;
+}
+
+.manual-body th,
+.manual-body td {
+  border: 1px solid #ddd;
+  padding: 0.45rem 0.55rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.manual-body th {
+  background: #f5f5f5;
+  font-weight: 600;
+}
+
+.manual-body code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.85em;
+  background: #f3f4f6;
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+}
+
+.manual-body a {
+  color: #2563eb;
+}
+
+.manual-body a:hover {
+  text-decoration: underline;
+}
+
+.manual-body em {
+  color: #6b7280;
+  font-style: italic;
+}
+
+@media (min-width: 720px) {
+  .manual-page {
+    padding: 1.5rem 1.25rem 3rem;
+  }
+}

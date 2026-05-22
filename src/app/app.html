@@ -2,34 +2,36 @@
   @if (staffChromeVisible()) {
     <header class="app-header">
       <span class="brand">{{ title() }}</span>
-      <nav aria-label="Main">
-        <a routerLink="/orders" routerLinkActive="active">Orders</a>
-        <a routerLink="/orders/new" routerLinkActive="active">New order</a>
-        <a routerLink="/foods" routerLinkActive="active">Foods</a>
-        <a routerLink="/foods/new" routerLinkActive="active">Add food</a>
-        <a routerLink="/food-categories" routerLinkActive="active">Categories</a>
-        <a routerLink="/food-categories/new" routerLinkActive="active">New category</a>
-        <a routerLink="/kitchens" routerLinkActive="active">Kitchens</a>
-        <a routerLink="/kitchens/prep" routerLinkActive="active">Kitchen prep</a>
-        <a routerLink="/kitchens/new" routerLinkActive="active">Add kitchen</a>
-        <a routerLink="/zones" routerLinkActive="active">Zones</a>
-        <a routerLink="/zones/new" routerLinkActive="active">Add zone</a>
-        <a routerLink="/tables" routerLinkActive="active">Tables</a>
-        <a routerLink="/tables/new" routerLinkActive="active">Add table</a>
+      <nav [attr.aria-label]="'nav.main' | t">
+        <a routerLink="/orders" routerLinkActive="active">{{ 'nav.orders' | t }}</a>
+        <a routerLink="/orders/new" routerLinkActive="active">{{ 'nav.newOrder' | t }}</a>
+        <a routerLink="/foods" routerLinkActive="active">{{ 'nav.foods' | t }}</a>
+        <a routerLink="/foods/new" routerLinkActive="active">{{ 'nav.addFood' | t }}</a>
+        <a routerLink="/food-categories" routerLinkActive="active">{{ 'nav.categories' | t }}</a>
+        <a routerLink="/food-categories/new" routerLinkActive="active">{{ 'nav.newCategory' | t }}</a>
+        <a routerLink="/kitchens" routerLinkActive="active">{{ 'nav.kitchens' | t }}</a>
+        <a routerLink="/kitchens/prep" routerLinkActive="active">{{ 'nav.kitchenPrep' | t }}</a>
+        <a routerLink="/kitchens/new" routerLinkActive="active">{{ 'nav.addKitchen' | t }}</a>
+        <a routerLink="/zones" routerLinkActive="active">{{ 'nav.zones' | t }}</a>
+        <a routerLink="/zones/new" routerLinkActive="active">{{ 'nav.addZone' | t }}</a>
+        <a routerLink="/tables" routerLinkActive="active">{{ 'nav.tables' | t }}</a>
+        <a routerLink="/tables/new" routerLinkActive="active">{{ 'nav.addTable' | t }}</a>
         <span class="nav-divider" aria-hidden="true"></span>
         <a
           routerLink="/reports"
           routerLinkActive="active"
           [routerLinkActiveOptions]="{ exact: false }"
-          >Reports</a
+          >{{ 'nav.reports' | t }}</a
         >
+        <a routerLink="/manual" routerLinkActive="active">{{ 'nav.manual' | t }}</a>
         <span class="nav-divider" aria-hidden="true"></span>
         @if (jwtAuth.isAuthenticated()) {
-          <a routerLink="/users" routerLinkActive="active">Users</a>
-          <button type="button" class="nav-button" (click)="logout()">Sign out</button>
+          <a routerLink="/users" routerLinkActive="active">{{ 'nav.users' | t }}</a>
+          <button type="button" class="nav-button" (click)="logout()">{{ 'nav.signOut' | t }}</button>
         } @else {
-          <a routerLink="/login" routerLinkActive="active">Sign in</a>
+          <a routerLink="/login" routerLinkActive="active">{{ 'nav.signIn' | t }}</a>
         }
+        <app-lang-switch />
       </nav>
     </header>
   }

@@ -12,12 +12,14 @@ import { defaultDatetimeLocal, normalizeLocalDateTimeForApi } from './order-date
 import { pingOrderCustomerDisplayRefresh } from './order-customer-display-sync';
 import { foodPickerLabel } from './order-merge.util';
 import type { OrderRequest } from './order.model';
+import { LocaleService } from '../i18n/locale.service';
+import { TranslatePipe } from '../i18n/translate.pipe';
 import { OrderService } from './order.service';
 
 @Component({
   selector: 'app-order-line-picker',
   standalone: true,
-  imports: [DecimalPipe],
+  imports: [DecimalPipe, TranslatePipe],
   templateUrl: './order-line-picker.component.html',
   styleUrl: './order-line-picker.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -29,6 +31,7 @@ export class OrderLinePickerComponent {
   private readonly orderService = inject(OrderService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly i18n = inject(LocaleService);
 
   readonly search = signal('');
   readonly qty = signal('1');
@@ -102,12 +105,12 @@ export class OrderLinePickerComponent {
 
   pickerHint(): string {
     if (this.from === 'orders') {
-      return 'Click food cards to build pending lines, then confirm to save.';
+      return this.i18n.translate('order.linePicker.hintOrders');
     }
     if (this.from === 'tables') {
-      return 'Click food cards to build pending lines for this table order, then confirm to save.';
+      return this.i18n.translate('order.linePicker.hintTables');
     }
-    return 'Tap a dish to queue it for your table. Use ← Change table if you chose the wrong seat.';
+    return this.i18n.translate('order.linePicker.hintGuest');
   }
 
   pick(food: Food): void {
@@ -119,7 +122,12 @@ export class OrderLinePickerComponent {
     queue.push({ foodId: food.id, qty });
     sessionStorage.setItem(this.queueStorageKey(), JSON.stringify(queue));
     this.pendingCount.set(queue.length);
-    this.notice.set(`Added ${qty} × ${foodPickerLabel(food)} to pending lines.`);
+    this.notice.set(
+      this.i18n.translate('order.linePicker.addedPending', {
+        qty,
+        food: foodPickerLabel(food),
+      }),
+    );
   }
 
   backToOrder(): void {
@@ -243,7 +251,7 @@ export class OrderLinePickerComponent {
     if (name && code) {
       return `${name} (${code})`;
     }
-    return name || code || 'Uncategorized';
+    return name || code || this.i18n.translate('order.linePicker.uncategorized');
   }
 
   private readPickedQueue(): Array<{ foodId: number; qty: number }> {
@@ -297,7 +305,7 @@ export class OrderLinePickerComponent {
   private submitGuestCreateNew(): void {
     const tableIdNum = Number(this.tableId ?? '');
     if (!Number.isFinite(tableIdNum) || tableIdNum < 1) {
-      this.guestError.set('Missing table. Scan the QR on your table again.');
+      this.guestError.set(this.i18n.translate('order.linePicker.missingTable'));
       return;
     }
     const queue = this.readPickedQueue();
@@ -313,9 +321,7 @@ export class OrderLinePickerComponent {
             (o) => o.table?.id === tableIdNum && !o.paid && !o.cancel,
           );
           if (clash) {
-            this.guestError.set(
-              'Someone just opened an order here. Reload this page / scan again to continue.',
-            );
+            this.guestError.set(this.i18n.translate('order.linePicker.orderClash'));
             return of(null);
           }
           const lines = queue.map((q) => ({
@@ -365,12 +371,14 @@ export class OrderLinePickerComponent {
       .pipe(
         switchMap((o) => {
           if (!o?.id || o.paid || o.cancel) {
-            const err = !o?.id ? 'Could not load this table’s order.' : 'This bill is closed.';
+            const err = !o?.id
+              ? this.i18n.translate('order.linePicker.couldNotLoadTableOrder')
+              : this.i18n.translate('order.linePicker.billClosed');
             throw new Error(err);
           }
           const body = buildOrderRequestAppendQueuedLines(o, queue);
           if (body == null) {
-            throw new Error('Order cannot be updated.');
+            throw new Error(this.i18n.translate('order.cannotUpdate'));
           }
           return this.orderService.updateOrder(o.id, body);
         }),
@@ -404,13 +412,13 @@ export class OrderLinePickerComponent {
         return err.error;
       }
       if (err.status >= 400) {
-        return `Request failed (HTTP ${err.status}). Try again.`;
+        return this.i18n.translate('common.requestFailedHttp', { status: err.status });
       }
     }
     if (err instanceof Error && err.message.trim().length > 0) {
       return err.message.trim();
     }
-    return 'Could not send order. Try again or ask staff.';
+    return this.i18n.translate('order.linePicker.couldNotSend');
   }
 
   private updatePendingQty(foodId: number, delta: number): void {

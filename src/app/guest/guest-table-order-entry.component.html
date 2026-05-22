@@ -3,24 +3,25 @@
   [class.guest-entry--dash]="openOrder() !== null && resolving() !== true && error() === null"
   [class.guest-entry--picker]="guestPickerMode()"
 >
+  <div class="guest-lang-bar">
+    <app-lang-switch class="lang-switch--light" />
+  </div>
   @if (guestPickerMode()) {
-    <h1>Choose your table</h1>
-    <p class="picker-intro">
-      Tap the table you are sitting at. Pick again later from your bill screen or menu if you moved. Staff can tell you the table code if needed.
-    </p>
+    <h1>{{ 'guest.chooseTable' | t }}</h1>
+    <p class="picker-intro">{{ 'guest.intro' | t }}</p>
     @if (guestTablesLoading()) {
-      <p class="status" aria-live="polite">Loading tables…</p>
+      <p class="status" aria-live="polite">{{ 'guest.loadingTables' | t }}</p>
     }
     @if (guestTablesError(); as terr) {
       <p class="error" role="alert">{{ terr }}</p>
-      <p class="hint">Check your network and try reloading the page.</p>
+      <p class="hint">{{ 'guest.networkHint' | t }}</p>
     } @else if (!guestTablesLoading()) {
-      <label class="picker-search-label" for="guest-table-q">Find table</label>
+      <label class="picker-search-label" for="guest-table-q">{{ 'guest.findTable' | t }}</label>
       <input
         id="guest-table-q"
         type="search"
         class="picker-search-input"
-        placeholder="Search zone or table code..."
+        [placeholder]="'guest.searchTable' | t"
         autocomplete="off"
         [ngModel]="guestTableSearch()"
         (ngModelChange)="guestTableSearch.set($event)"
@@ -33,37 +34,37 @@
             </button>
           </li>
         } @empty {
-          <li class="table-pick-empty">No tables match that search.</li>
+          <li class="table-pick-empty">{{ 'guest.noTablesMatch' | t }}</li>
         }
       </ul>
     }
   } @else if (error(); as err) {
-    <h1>Guest order</h1>
+    <h1>{{ 'guest.orderTitle' | t }}</h1>
     <p class="error" role="alert">{{ err }}</p>
-    <p class="hint">Ask staff if this keeps failing.</p>
+    <p class="hint">{{ 'guest.askStaff' | t }}</p>
     @if (!guestTablesLoading()) {
       <button type="button" class="btn btn-secondary picker-retry-inline" (click)="clearTableAndPickAgain()">
-        Back to choose table
+        {{ 'guest.backChooseTable' | t }}
       </button>
     }
   } @else if (resolving()) {
-    <h1>Your table</h1>
-    <p class="status" aria-live="polite">Loading…</p>
+    <h1>{{ 'guest.yourTable' | t }}</h1>
+    <p class="status" aria-live="polite">{{ 'common.loading' | t }}</p>
   } @else if (openOrder(); as order) {
-    <h1>Your table</h1>
+    <h1>{{ 'guest.yourTable' | t }}</h1>
     @if (guestDisplayTableCode()) {
-      <p class="table-header">Table <span class="mono">{{ guestDisplayTableCode() }}</span></p>
+      <p class="table-header">{{ 'common.table' | t }} <span class="mono">{{ guestDisplayTableCode() }}</span></p>
     }
 
-    <p class="order-no">Order <span class="mono">{{ order.orderNo }}</span></p>
+    <p class="order-no">{{ 'common.order' | t }} <span class="mono">{{ order.orderNo }}</span></p>
 
     <p class="status-summary" aria-live="polite">{{ lineStatusGuestLabel(order) }}</p>
 
     <div class="lines-card">
-      <h2 class="lines-heading">Items</h2>
+      <h2 class="lines-heading">{{ 'guest.items' | t }}</h2>
       <ul class="lines-list">
         @for (ln of order.lines; track $index) {
-          <li class="line-row" [class.line-row--cancel]="lineRowStatusLabel(ln, order) === 'Canceled'">
+          <li class="line-row" [class.line-row--cancel]="lineRowIsCanceled(ln, order)">
             <span class="line-main">
               <span class="mono">{{ ln.quantity }}×</span>
               {{ lineFoodLabel(ln) }}
@@ -71,31 +72,31 @@
             <span class="line-badge">{{ lineRowStatusLabel(ln, order) }}</span>
           </li>
         } @empty {
-          <li class="lines-empty">No lines yet.</li>
+          <li class="lines-empty">{{ 'guest.noLinesYet' | t }}</li>
         }
       </ul>
     </div>
 
     <p class="total-due">
-      Total due
+      {{ 'guest.totalDue' | t }}
       <span class="mono total-due-value">{{ payableTotal(order) | number: '1.2-2' }}</span>
     </p>
 
     <div class="actions">
       <button type="button" class="btn btn-change-table" (click)="clearTableAndPickAgain()">
-        Change table
+        {{ 'guest.changeTable' | t }}
       </button>
       <button type="button" class="btn btn-secondary" [disabled]="refreshingOrders()" (click)="refreshOpenOrder()">
-        {{ refreshingOrders() ? 'Refreshing…' : 'Refresh' }}
+        {{ refreshingOrders() ? ('common.refreshing' | t) : ('common.refresh' | t) }}
       </button>
-      <button type="button" class="btn btn-primary" (click)="goAddDishes()">Add more dishes</button>
+      <button type="button" class="btn btn-primary" (click)="goAddDishes()">{{ 'guest.addMoreDishes' | t }}</button>
       <button
         type="button"
         class="btn btn-pay"
         [disabled]="payableTotal(order) <= 0"
         (click)="openSettlePayment()"
       >
-        Settle payment
+        {{ 'guest.settlePayment' | t }}
       </button>
     </div>
   }
@@ -109,20 +110,20 @@
         aria-labelledby="guest-pay-title"
         (click)="$event.stopPropagation()"
       >
-        <h3 id="guest-pay-title">Settle payment</h3>
+        <h3 id="guest-pay-title">{{ 'guest.settlePayment' | t }}</h3>
         <p class="dialog-order-no">
-          Order: <span class="mono">{{ po.orderNo }}</span>
+          {{ 'common.order' | t }}: <span class="mono">{{ po.orderNo }}</span>
         </p>
         @if (payError(); as pe) {
           <p class="pay-inline-error" role="alert">{{ pe }}</p>
         }
         <p class="pay-total">
-          Total to pay (excludes canceled lines):
+          {{ 'guest.totalToPay' | t }}
           <span class="mono">{{ payableTotal(po) | number: '1.2-2' }}</span>
         </p>
         <app-promptpay-qr-display [amountBaht]="payableTotal(po)" />
         <div class="pay-dialog-order-note">
-          <span class="pay-dialog-order-note-label">Note to kitchen / staff (optional)</span>
+          <span class="pay-dialog-order-note-label">{{ 'guest.noteOptional' | t }}</span>
           @if (payNoteError(); as ne) {
             <p class="pay-dialog-note-error" role="alert">{{ ne }}</p>
           }
@@ -137,7 +138,7 @@
             (ngModelChange)="payNoteDraft.set($event)"
           ></textarea>
         </div>
-        <label class="pay-input-label" for="guest-pay-amount">Amount you pay</label>
+        <label class="pay-input-label" for="guest-pay-amount">{{ 'guest.amountYouPay' | t }}</label>
         <input
           id="guest-pay-amount"
           type="number"
@@ -153,11 +154,9 @@
         @let change = payDialogChange(po);
         @if (change > 0) {
           <p class="pay-change">
-            Change: <span class="mono">{{ change | number: '1.2-2' }}</span>
+            {{ 'common.change' | t }}: <span class="mono">{{ change | number: '1.2-2' }}</span>
           </p>
-          <p class="pay-qr-gate">
-            QR and credit need the <strong>exact</strong> total (no change). Adjust the amount above.
-          </p>
+          <p class="pay-qr-gate">{{ 'guest.qrCreditExact' | t }}</p>
         }
         <div class="guest-pay-actions">
           <button
@@ -168,7 +167,7 @@
             "
             (click)="confirmCashPay()"
           >
-            {{ payingId() === po.id ? 'Processing…' : 'Paid by cash' }}
+            {{ payingId() === po.id ? ('common.processing' | t) : ('guest.paidByCash' | t) }}
           </button>
           <button
             type="button"
@@ -176,7 +175,7 @@
             [disabled]="payQrSettlementDisabled(po)"
             (click)="confirmQrPay()"
           >
-            {{ payingId() === po.id ? 'Processing…' : 'Paid by QR' }}
+            {{ payingId() === po.id ? ('common.processing' | t) : ('guest.paidByQr' | t) }}
           </button>
           <button
             type="button"
@@ -184,10 +183,10 @@
             [disabled]="payQrSettlementDisabled(po)"
             (click)="confirmCreditPay()"
           >
-            {{ payingId() === po.id ? 'Processing…' : 'Credit' }}
+            {{ payingId() === po.id ? ('common.processing' | t) : ('guest.paidByCredit' | t) }}
           </button>
           <button type="button" class="dialog-cancel-btn" [disabled]="payingId() === po.id" (click)="closePayment()">
-            Close
+            {{ 'common.close' | t }}
           </button>
         </div>
       </div>

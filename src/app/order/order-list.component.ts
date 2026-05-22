@@ -49,12 +49,14 @@ import { pingOrderCustomerDisplayRefresh } from './order-customer-display-sync';
 import { lineKitchenNote, orderLineRequestNotePart } from './order-line-note.util';
 import type { OrderLine, OrderLineStatus, OrderRequest, PayOrderRequest, PosOrder } from './order.model';
 import { OrderService } from './order.service';
+import { LocaleService } from '../i18n/locale.service';
+import { TranslatePipe } from '../i18n/translate.pipe';
 import { PromptPayQrDisplayComponent } from '../payment/promptpay-qr-display.component';
 
 @Component({
   selector: 'app-order-list',
   standalone: true,
-  imports: [DatePipe, DecimalPipe, FormsModule, RouterLink, PromptPayQrDisplayComponent],
+  imports: [DatePipe, DecimalPipe, FormsModule, RouterLink, PromptPayQrDisplayComponent, TranslatePipe],
   templateUrl: './order-list.component.html',
   styleUrl: './order-list.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -74,6 +76,7 @@ export class OrderListComponent {
   private readonly router = inject(Router);
   private readonly customerDisplaySession = inject(CustomerDisplaySessionService);
   private readonly injector = inject(Injector);
+  private readonly i18n = inject(LocaleService);
   /** Focus target when Settle payment opens. */
   private readonly payAmountInputRef = viewChild<ElementRef<HTMLInputElement>>('payAmountInput');
 
@@ -137,7 +140,9 @@ export class OrderListComponent {
           switchMap(() =>
             this.orderService.searchOrders(trimmed || undefined).pipe(
               catchError(() => {
-                this.error.set('Could not load orders. Check that the API is running.');
+                this.error.set(
+                  this.i18n.translate('common.couldNotLoad', { entity: this.i18n.translate('order.entity') }),
+                );
                 return of([] as PosOrder[]);
               }),
               finalize(() => this.loading.set(false)),
@@ -304,7 +309,7 @@ export class OrderListComponent {
       return;
     }
     this.deleteError.set(null);
-    if (!window.confirm(`Delete order "${o.orderNo}"?`)) {
+    if (!window.confirm(this.i18n.translate('order.deleteConfirm', { orderNo: o.orderNo }))) {
       return;
     }
     this.deletingId.set(o.id);
@@ -317,7 +322,7 @@ export class OrderListComponent {
           this.deleteError.set(
             this.extractErrorMessage(
               err,
-              'Could not delete order. Check API connectivity and dependencies.',
+              this.i18n.translate('common.couldNotDelete', { entity: this.i18n.translate('order.entity') }),
             ),
           );
         },
@@ -391,7 +396,7 @@ export class OrderListComponent {
     const amount = Number(this.payInputAmount());
     const rawPay = buildPayOrderRequest(amount, this.payableTotal(order));
     if ('error' in rawPay) {
-      this.payError.set(rawPay.error);
+      this.payError.set(this.i18n.translate(rawPay.error));
       return;
     }
     this.submitPaymentFromDialog(order, rawPay);
@@ -405,13 +410,13 @@ export class OrderListComponent {
       return;
     }
     if (this.payQrSettlementDisabled(order)) {
-      this.payError.set('Paid by QR needs the entered amount to equal the total (no change).');
+      this.payError.set(this.i18n.translate('order.qrExactTotal'));
       return;
     }
     const due = this.payableTotal(order);
     const rawPay = buildPayOrderRequest(due, due);
     if ('error' in rawPay) {
-      this.payError.set(rawPay.error);
+      this.payError.set(this.i18n.translate(rawPay.error));
       return;
     }
     this.submitPaymentFromDialog(order, { ...rawPay, paidByQrScan: true });
@@ -425,13 +430,13 @@ export class OrderListComponent {
       return;
     }
     if (this.payQrSettlementDisabled(order)) {
-      this.payError.set('Paid by credit needs the entered amount to equal the total (no change).');
+      this.payError.set(this.i18n.translate('order.creditExactTotal'));
       return;
     }
     const due = this.payableTotal(order);
     const rawPay = buildPayOrderRequest(due, due);
     if ('error' in rawPay) {
-      this.payError.set(rawPay.error);
+      this.payError.set(this.i18n.translate(rawPay.error));
       return;
     }
     this.submitPaymentFromDialog(order, { ...rawPay, paidByCredit: true });
@@ -483,7 +488,7 @@ export class OrderListComponent {
           const baseBody = orderRequestCompleteAllExceptCanceled(fresh);
           if (baseBody == null) {
             return throwError(
-              () => new Error('Order has no table reference and cannot be updated.'),
+              () => new Error(this.i18n.translate('order.noTableUpdate')),
             );
           }
           const prepBody = mergePayOrderAmounts({ ...baseBody, note: draft }, payBody);
@@ -502,7 +507,7 @@ export class OrderListComponent {
         error: (err: unknown) => {
           const message = this.extractErrorMessage(
             err,
-            'Could not record payment (check amount, note, or API).',
+            this.i18n.translate('order.couldNotRecordPayment'),
           );
           this.payError.set(message);
           this.payDialogNoteError.set(message);
@@ -580,12 +585,12 @@ export class OrderListComponent {
       return;
     }
     if (!Number.isFinite(qty) || qty < 1) {
-      this.addLineError.set('Quantity must be at least 1.');
+      this.addLineError.set(this.i18n.translate('order.qtyMinOne'));
       return;
     }
     const foodRow = this.foods().find((f) => f.id === pickedFoodId);
     if (foodRow && foodBlocksOrderLines(foodRow)) {
-      this.addLineError.set('This food cannot be ordered (blocked in Foods list).');
+      this.addLineError.set(this.i18n.translate('order.foodBlocked'));
       return;
     }
     this.addLineToOrder(o, pickedFoodId, qty);
@@ -624,9 +629,15 @@ export class OrderListComponent {
   /** Label for tooltips / accessibility (API uses `FINISH_COOKING`, etc.). */
   lineStatusLabel(status: OrderLineStatus): string {
     if (status === 'FINISH_COOKING') {
-      return 'Finish cooking';
+      return this.i18n.translate('order.statusFinishCooking');
     }
-    return status === 'COMPLETE' ? 'Complete' : status === 'CANCEL' ? 'Cancel' : 'Wait';
+    if (status === 'COMPLETE') {
+      return this.i18n.translate('order.statusComplete');
+    }
+    if (status === 'CANCEL') {
+      return this.i18n.translate('order.statusCancel');
+    }
+    return this.i18n.translate('order.statusWait');
   }
 
   private lineUpdateKey(orderId: number, lineIndex: number): string {
@@ -655,7 +666,7 @@ export class OrderListComponent {
     this.statusError.set(null);
     const body = orderRequestCompleteAllExceptCanceled(o);
     if (body == null) {
-      this.statusError.set('Order has no table reference and cannot be updated.');
+      this.statusError.set(this.i18n.translate('order.noTableUpdate'));
       return;
     }
     this.completeAllOrderId.set(o.id);
@@ -672,7 +683,7 @@ export class OrderListComponent {
         },
         error: (err: unknown) => {
           this.statusError.set(
-            this.extractErrorMessage(err, 'Could not update line status. Check API connectivity.'),
+            this.extractErrorMessage(err, this.i18n.translate('order.couldNotUpdateStatus')),
           );
         },
       });
@@ -727,7 +738,7 @@ export class OrderListComponent {
         },
         error: (err: unknown) => {
           this.statusError.set(
-            this.extractErrorMessage(err, 'Could not update line status. Check API connectivity.'),
+            this.extractErrorMessage(err, this.i18n.translate('order.couldNotUpdateStatus')),
           );
         },
       });
@@ -735,7 +746,7 @@ export class OrderListComponent {
 
   tableCell(t: PosTable | null | undefined): string {
     if (!t) {
-      return '—';
+      return this.i18n.translate('common.emptyDash');
     }
     return tablePickerLabel(t);
   }
@@ -750,7 +761,7 @@ export class OrderListComponent {
   linesSummary(o: PosOrder): string {
     const lines = o.lines ?? [];
     if (lines.length === 0) {
-      return '—';
+      return this.i18n.translate('common.emptyDash');
     }
     return lines
       .map((ln) => {
@@ -833,7 +844,7 @@ export class OrderListComponent {
         return err.error;
       }
       if (err.status >= 400) {
-        return `Request failed (HTTP ${err.status})`;
+        return this.i18n.translate('common.requestFailedHttp', { status: err.status });
       }
     }
     return '';
@@ -843,7 +854,7 @@ export class OrderListComponent {
     const orderId = o.id;
     const tableId = o.table?.id;
     if (orderId == null || tableId == null) {
-      this.addLineError.set('Order has no table reference and cannot be updated.');
+      this.addLineError.set(this.i18n.translate('order.noTableUpdate'));
       return;
     }
     const body = mergeOrderRequestPaymentFromPosOrder(
@@ -894,7 +905,7 @@ export class OrderListComponent {
     const orderId = o.id;
     const tableId = o.table?.id;
     if (orderId == null || tableId == null || o.paid) {
-      this.addLineError.set('Order cannot be updated.');
+      this.addLineError.set(this.i18n.translate('order.cannotUpdate'));
       return;
     }
     const merged = new Map<number, number>();
@@ -939,7 +950,7 @@ export class OrderListComponent {
         },
         error: (err: unknown) => {
           this.addLineError.set(
-            this.extractErrorMessage(err, 'Could not add line. Check API connectivity.'),
+            this.extractErrorMessage(err, this.i18n.translate('order.couldNotAddLine')),
           );
         },
       });

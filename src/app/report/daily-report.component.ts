@@ -4,6 +4,8 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import { RouterLink } from '@angular/router';
 import { catchError, finalize, of } from 'rxjs';
 
+import { LocaleService } from '../i18n/locale.service';
+import { TranslatePipe } from '../i18n/translate.pipe';
 import type { DailyReport } from './report.model';
 import { ReportService } from './report.service';
 
@@ -18,13 +20,14 @@ function todayYmd(): string {
 @Component({
   selector: 'app-daily-report',
   standalone: true,
-  imports: [DatePipe, DecimalPipe, RouterLink],
+  imports: [DatePipe, DecimalPipe, RouterLink, TranslatePipe],
   templateUrl: './daily-report.component.html',
   styleUrl: './daily-report.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class DailyReportComponent {
   private readonly reportService = inject(ReportService);
+  private readonly i18n = inject(LocaleService);
 
   readonly startDate = signal(todayYmd());
   readonly endDate = signal(todayYmd());
@@ -98,8 +101,10 @@ export class DailyReportComponent {
       if (typeof err.error === 'string' && err.error.trim()) {
         return err.error;
       }
-      return err.message || `Request failed (${err.status})`;
+      return (
+        err.message || this.i18n.translate('common.requestFailedHttp', { status: err.status })
+      );
     }
-    return 'Could not load daily report.';
+    return this.i18n.translate('report.couldNotLoad');
   }
 }

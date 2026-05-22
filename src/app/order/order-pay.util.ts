@@ -1,3 +1,4 @@
+import type { TranslationKey } from '../i18n/translations';
 import type {
   OrderLineRequest,
   OrderRequest,
@@ -6,7 +7,7 @@ import type {
   PosOrder,
 } from './order.model';
 
-export type PayOrderRequestResult = PayOrderRequest | { error: string };
+export type PayOrderRequestResult = PayOrderRequest | { error: TranslationKey };
 
 const PAID_PRICE_KEYS = [
   'paidPrice',
@@ -97,15 +98,15 @@ export function trimOrderNote(raw: unknown): string | undefined {
   return t.length > 0 ? t : undefined;
 }
 
-/** Label for customer receipt / display after payment. */
-export function orderPaymentMethodLabel(o: PosOrder): string {
+/** i18n key for how the order was settled (cash, QR, or credit). */
+export function orderPaymentMethodKey(o: PosOrder): TranslationKey {
   if (readOrderPaidByQrScan(o)) {
-    return 'QR scan';
+    return 'payment.qrScan';
   }
   if (readOrderPaidByCredit(o)) {
-    return 'Credit card';
+    return 'payment.creditCard';
   }
-  return 'Cash';
+  return 'payment.cash';
 }
 
 function finiteField(v: unknown): number | null {
@@ -264,12 +265,12 @@ export function mergePayOrderAmounts(body: OrderRequest, pay: PayOrderRequest): 
 /** Cent-safe tender/change for `POST /api/orders/{id}/pay`. */
 export function buildPayOrderRequest(amountRaw: number, payableTotal: number): PayOrderRequestResult {
   if (!Number.isFinite(amountRaw) || amountRaw < 0) {
-    return { error: 'Please enter a valid amount to pay.' };
+    return { error: 'payment.validAmount' };
   }
   const tenderCents = Math.round(amountRaw * 100);
   const dueCents = Math.round(payableTotal * 100);
   if (tenderCents < dueCents) {
-    return { error: 'Amount received must be at least the total to pay.' };
+    return { error: 'payment.amountTooLow' };
   }
   return {
     paidPrice: tenderCents / 100,

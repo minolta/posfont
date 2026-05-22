@@ -1,13 +1,10 @@
 <div class="page">
-  <a routerLink="/zones" class="back">← Back to zones</a>
-  <h1>Edit zone</h1>
-  <p class="hint">
-    A <strong>photo is required</strong> for every zone: add one here if missing, or replace before saving when needed.
-    Include <span class="mono">version</span> for optimistic locking.
-  </p>
+  <a routerLink="/zones" class="back">{{ 'common.backTo' | t:{ target: ('zone.backZones' | t) } }}</a>
+  <h1>{{ 'zone.editTitle' | t }}</h1>
+  <p class="hint">{{ 'zone.editHint' | t }}</p>
 
   @if (loading()) {
-    <p class="status">Loading…</p>
+    <p class="status">{{ 'common.loading' | t }}</p>
   } @else if (loadError(); as le) {
     <p class="error-banner" role="alert">{{ le }}</p>
   } @else {
@@ -16,12 +13,12 @@
     }
 
     @if (photoRequiredHint() && !hasZonePhoto()) {
-      <p class="error-banner" role="alert">This zone must have a photo. Choose a file and upload, or pick a file to include on Save.</p>
+      <p class="error-banner" role="alert">{{ 'zone.photoRequiredBanner' | t }}</p>
     }
 
     <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
       <div class="field" [class.invalid]="form.controls.code.invalid && form.controls.code.touched">
-        <label for="zone-edit-code">Code</label>
+        <label for="zone-edit-code">{{ 'common.code' | t }}</label>
         <input
           id="zone-edit-code"
           type="text"
@@ -32,12 +29,12 @@
           [readonly]="submitting()"
         />
         @if (form.controls.code.invalid && form.controls.code.touched) {
-          <span class="err">Enter a valid code.</span>
+          <span class="err">{{ 'common.validCode' | t }}</span>
         }
       </div>
 
       <div class="field" [class.invalid]="form.controls.name.invalid && form.controls.name.touched">
-        <label for="zone-edit-name">Name</label>
+        <label for="zone-edit-name">{{ 'common.name' | t }}</label>
         <input
           id="zone-edit-name"
           type="text"
@@ -47,18 +44,18 @@
           [readonly]="submitting()"
         />
         @if (form.controls.name.invalid && form.controls.name.touched) {
-          <span class="err">Name is required.</span>
+          <span class="err">{{ 'common.required' | t:{ field: ('common.name' | t) } }}</span>
         }
       </div>
 
       <div class="field">
-        <label>Photo <span class="req">(required)</span></label>
+        <label>{{ 'zone.photo' | t }} <span class="req">{{ 'common.requiredLabel' | t }}</span></label>
         @if (currentPictureSrc(); as ps) {
           <div class="picture-row">
             <img [src]="ps" alt="" class="zone-photo-preview" width="120" height="120" />
           </div>
         } @else {
-          <p class="hint-inline">No image yet — choose a file and upload, or attach one and use Save.</p>
+          <p class="hint-inline">{{ 'zone.editHint' | t }}</p>
         }
         <input
           type="file"
@@ -70,22 +67,22 @@
         }
         <div class="picture-actions">
           <button type="button" [disabled]="pictureUploading() || pictureFile() == null" (click)="uploadPicture()">
-            {{ pictureUploading() ? 'Uploading…' : 'Upload / replace image' }}
+            {{ pictureUploading() ? ('common.uploading' | t) : ('common.uploadReplace' | t) }}
           </button>
         </div>
       </div>
 
       <div class="field" [class.invalid]="form.controls.version.invalid && form.controls.version.touched">
-        <label for="zone-edit-version">Version</label>
+        <label for="zone-edit-version">{{ 'common.version' | t }}</label>
         <input id="zone-edit-version" type="number" formControlName="version" min="0" step="1" [readonly]="submitting()" />
         @if (form.controls.version.invalid && form.controls.version.touched) {
-          <span class="err">Version must be a non‑negative integer from the server.</span>
+          <span class="err">{{ 'common.versionNonNegative' | t }}</span>
         }
       </div>
 
       <div class="actions">
         <button type="submit" [disabled]="submitting() || !canSubmitForm()">
-          {{ submitting() ? 'Saving…' : 'Save changes' }}
+          {{ submitting() ? ('common.saving' | t) : ('common.saveChanges' | t) }}
         </button>
       </div>
     </form>

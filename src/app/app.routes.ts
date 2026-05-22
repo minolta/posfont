@@ -137,6 +137,11 @@ export const routes: Routes = [
   },
   { path: 'backup', redirectTo: 'reports/backup', pathMatch: 'full' },
   {
+    path: 'manual',
+    loadComponent: () =>
+      import('./manual/user-manual.component').then((m) => m.UserManualComponent),
+  },
+  {
     path: 'reports',
     loadComponent: () =>
       import('./report/reports-layout.component').then((m) => m.ReportsLayoutComponent),

@@ -28,6 +28,8 @@ import {
 import type { Zone } from '../zone/zone.model';
 import { PromptPayQrDisplayComponent } from '../payment/promptpay-qr-display.component';
 import { UrlQrService } from '../payment/url-qr.service';
+import { LocaleService } from '../i18n/locale.service';
+import { TranslatePipe } from '../i18n/translate.pipe';
 import {
   orderRequestCompleteAllExceptCanceled,
   resolvedLineStatus,
@@ -46,7 +48,7 @@ import { TableService } from './table.service';
 @Component({
   selector: 'app-table-list',
   standalone: true,
-  imports: [DecimalPipe, FormsModule, RouterLink, PromptPayQrDisplayComponent],
+  imports: [DecimalPipe, FormsModule, RouterLink, PromptPayQrDisplayComponent, TranslatePipe],
   templateUrl: './table-list.component.html',
   styleUrl: './table-list.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -61,6 +63,7 @@ export class TableListComponent {
   private readonly urlQrService = inject(UrlQrService);
   private readonly customerDisplaySession = inject(CustomerDisplaySessionService);
   private readonly injector = inject(Injector);
+  private readonly i18n = inject(LocaleService);
   private readonly payAmountInputRef = viewChild<ElementRef<HTMLInputElement>>('payAmountInput');
 
   readonly createdId = toSignal(
@@ -131,7 +134,11 @@ export class TableListComponent {
           switchMap(() =>
             this.tableService.searchTables(trimmed || undefined).pipe(
               catchError(() => {
-                this.error.set('Could not load tables. Check that the API is running.');
+                this.error.set(
+                  this.i18n.translate('common.couldNotLoad', {
+                    entity: this.i18n.translate('table.entity'),
+                  }),
+                );
                 return of([] as PosTable[]);
               }),
               finalize(() => this.loading.set(false)),
@@ -181,7 +188,9 @@ export class TableListComponent {
           this.deleteError.set(
             this.extractErrorMessage(
               err,
-              'Could not delete table. Check API connectivity and dependencies.',
+              this.i18n.translate('common.couldNotDelete', {
+                entity: this.i18n.translate('table.entity'),
+              }),
             ),
           );
         },
@@ -222,7 +231,7 @@ export class TableListComponent {
     this.orderEntryQrUrl.set(href);
     const dataUrl = await this.urlQrService.toDataUrl(href);
     if (dataUrl == null) {
-      this.orderEntryQrError.set('Could not create QR code.');
+      this.orderEntryQrError.set(this.i18n.translate('common.requestFailed'));
     } else {
       this.orderEntryQrDataUrl.set(dataUrl);
     }
@@ -255,7 +264,7 @@ export class TableListComponent {
   openPayDialogForTable(tableId: number): void {
     const order = this.openOrderByTable(tableId);
     if (!order || order.id == null) {
-      this.payError.set('No unpaid open order found for this table.');
+      this.payError.set(this.i18n.translate('common.notFound', { entity: this.i18n.translate('order.entity') }));
       return;
     }
     this.payError.set(null);
@@ -326,7 +335,7 @@ export class TableListComponent {
     const amount = Number(this.payInputAmount());
     const rawPay = buildPayOrderRequest(amount, this.payableTotal(order));
     if ('error' in rawPay) {
-      this.payError.set(rawPay.error);
+      this.payError.set(this.i18n.translate(rawPay.error));
       return;
     }
     this.submitPaymentFromDialog(order, rawPay);
@@ -339,13 +348,13 @@ export class TableListComponent {
       return;
     }
     if (this.payQrSettlementDisabled(order)) {
-      this.payError.set('Paid by QR needs the entered amount to equal the total (no change).');
+      this.payError.set(this.i18n.translate('order.qrExactTotal'));
       return;
     }
     const due = this.payableTotal(order);
     const rawPay = buildPayOrderRequest(due, due);
     if ('error' in rawPay) {
-      this.payError.set(rawPay.error);
+      this.payError.set(this.i18n.translate(rawPay.error));
       return;
     }
     this.submitPaymentFromDialog(order, { ...rawPay, paidByQrScan: true });
@@ -358,13 +367,13 @@ export class TableListComponent {
       return;
     }
     if (this.payQrSettlementDisabled(order)) {
-      this.payError.set('Paid by credit needs the entered amount to equal the total (no change).');
+      this.payError.set(this.i18n.translate('order.creditExactTotal'));
       return;
     }
     const due = this.payableTotal(order);
     const rawPay = buildPayOrderRequest(due, due);
     if ('error' in rawPay) {
-      this.payError.set(rawPay.error);
+      this.payError.set(this.i18n.translate(rawPay.error));
       return;
     }
     this.submitPaymentFromDialog(order, { ...rawPay, paidByCredit: true });
@@ -398,7 +407,7 @@ export class TableListComponent {
 
   private submitPaymentFromDialog(order: PosOrder, payBody: PayOrderRequest): void {
     if (order.id == null || order.table?.id == null) {
-      this.payError.set('Order has no table reference and cannot be paid.');
+      this.payError.set(this.i18n.translate('order.noTablePay'));
       return;
     }
     const id = order.id;
@@ -416,7 +425,7 @@ export class TableListComponent {
           const baseBody = orderRequestCompleteAllExceptCanceled(fresh);
           if (baseBody == null) {
             return throwError(
-              () => new Error('Order has no table reference and cannot be updated.'),
+              () => new Error(this.i18n.translate('order.noTableUpdate')),
             );
           }
           const prepBody = mergePayOrderAmounts({ ...baseBody, note: draft }, payBody);
@@ -435,7 +444,7 @@ export class TableListComponent {
         error: (err: unknown) => {
           const message = this.extractErrorMessage(
             err,
-            'Could not record payment (check amount, note, or API).',
+            this.i18n.translate('common.requestFailed'),
           );
           this.payError.set(message);
           this.payDialogNoteError.set(message);
@@ -488,7 +497,7 @@ export class TableListComponent {
   openAddLineForTable(tableId: number): void {
     const order = this.openOrderByTable(tableId);
     if (!order || order.id == null) {
-      this.payError.set('No unpaid open order found for this table.');
+      this.payError.set(this.i18n.translate('common.notFound', { entity: this.i18n.translate('order.entity') }));
       return;
     }
     void this.router.navigate(['/orders/new/line-picker'], {
@@ -532,7 +541,7 @@ export class TableListComponent {
         return err.error;
       }
       if (err.status >= 400) {
-        return `Request failed (HTTP ${err.status})`;
+        return this.i18n.translate('common.requestFailedHttp', { status: err.status });
       }
     }
     return '';
@@ -540,9 +549,10 @@ export class TableListComponent {
 
   /** Short label for the Order QR dialog (table code + zone when present). */
   tableOrderQrCaption(t: PosTable): string {
-    const code = (t.code ?? '').trim() || (t.id != null ? `Table #${t.id}` : 'Table');
+    const code = (t.code ?? '').trim() || (t.id != null ? `${this.i18n.translate('common.table')} #${t.id}` : this.i18n.translate('common.table'));
     const z = this.zoneCell(t.zone);
-    if (z && z !== '—') {
+    const dash = this.i18n.translate('common.emptyDash');
+    if (z && z !== dash) {
       return `${code} · ${z}`;
     }
     return code;
@@ -550,13 +560,17 @@ export class TableListComponent {
 
   zoneCell(z: Zone | null | undefined): string {
     if (!z) {
-      return '—';
+      return this.i18n.translate('common.emptyDash');
     }
     const name = (z.name ?? '').trim();
     const code = (z.code ?? '').trim();
     if (name && code) {
       return `${name} (${code})`;
     }
-    return name || code || '—';
+    return name || code || this.i18n.translate('common.emptyDash');
+  }
+
+  orderQrAltLabel(): string {
+    return this.i18n.translate('table.qrAlt');
   }
 }

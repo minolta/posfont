@@ -1,0 +1,20 @@
+<div class="manual-page">
+  <a routerLink="/tables" class="back">{{ 'manual.back' | t }}</a>
+
+  <header class="manual-head">
+    <h1>{{ 'manual.title' | t }}</h1>
+    <p class="hint">{{ 'manual.hint' | t }}</p>
+  </header>
+
+  @if (loading()) {
+    <p class="status" role="status">{{ 'common.loading' | t }}</p>
+  }
+
+  @if (error(); as er) {
+    <p class="error-banner" role="alert">{{ er }}</p>
+  }
+
+  @if (html(); as content) {
+    <article class="manual-body" [innerHTML]="content"></article>
+  }
+</div>

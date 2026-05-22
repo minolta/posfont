@@ -1,11 +1,11 @@
 @if (dataUrl(); as src) {
-  <div class="promptpay-wrap" aria-label="PromptPay QR code">
-    <p class="promptpay-heading">PromptPay</p>
+  <div class="promptpay-wrap" [attr.aria-label]="'payment.qrCode' | t">
+    <p class="promptpay-heading">{{ 'payment.promptPay' | t }}</p>
     <img class="promptpay-img" [src]="src" width="220" height="220" alt="" />
     <p class="promptpay-amount">
       <span class="mono">{{ amountBaht() | number: '1.2-2' }}</span>
-      <span class="thb-suffix">THB</span>
+      <span class="thb-suffix">{{ 'payment.thb' | t }}</span>
     </p>
-    <p class="hint">Customer scans with a Thai banking app. Amount matches total to pay.</p>
+    <p class="hint">{{ 'payment.qrHint' | t }}</p>
   </div>
 }

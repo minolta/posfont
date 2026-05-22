@@ -1,9 +1,7 @@
 <div class="page">
-  <a routerLink="/tables" class="back">← Back to tables</a>
-  <h1>Add table</h1>
-  <p class="hint">
-    Enter table code, base price, and zone; use <span class="mono">version</span> <code>0</code> for new rows.
-  </p>
+  <a routerLink="/tables" class="back">{{ 'common.backTo' | t:{ target: ('table.backTables' | t) } }}</a>
+  <h1>{{ 'table.addTitle' | t }}</h1>
+  <p class="hint">{{ 'table.addHint' | t }}</p>
 
   @if (errorMessage(); as msg) {
     <p class="error-banner" role="alert">{{ msg }}</p>
@@ -11,7 +9,7 @@
 
   <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
     <div class="field" [class.invalid]="form.controls.code.invalid && form.controls.code.touched">
-      <label for="table-code">Code</label>
+      <label for="table-code">{{ 'common.code' | t }}</label>
       <input
         id="table-code"
         type="text"
@@ -19,16 +17,16 @@
         autocomplete="off"
         spellcheck="false"
         maxlength="255"
-        placeholder="e.g. T-01"
+        [placeholder]="'table.codeExample' | t"
         [readonly]="submitting()"
       />
       @if (form.controls.code.invalid && form.controls.code.touched) {
-        <span class="err">Enter a unique code (not only spaces).</span>
+        <span class="err">{{ 'common.uniqueCode' | t }}</span>
       }
     </div>
 
     <div class="field" [class.invalid]="form.controls.basePrice.invalid && form.controls.basePrice.touched">
-      <label for="table-basePrice">Base price</label>
+      <label for="table-basePrice">{{ 'common.basePrice' | t }}</label>
       <input
         id="table-basePrice"
         type="number"
@@ -38,28 +36,28 @@
         [readonly]="submitting()"
       />
       @if (form.controls.basePrice.invalid && form.controls.basePrice.touched) {
-        <span class="err">Enter a price ≥ 0.</span>
+        <span class="err">{{ 'common.priceMinZero' | t }}</span>
       }
     </div>
 
     <div class="field" [class.invalid]="form.controls.zoneId.invalid && form.controls.zoneId.touched">
-      <label for="zone-select">Zone</label>
+      <label for="zone-select">{{ 'common.zone' | t }}</label>
       @if (zones().length > 0) {
         <div class="pick-with-search">
-          <label class="label-text" for="zone-search">Find zone</label>
+          <label class="label-text" for="zone-search">{{ 'table.findZone' | t }}</label>
           <input
             id="zone-search"
             type="search"
             autocomplete="off"
-            placeholder="Name, code, or id…"
+            [placeholder]="'table.zonePlaceholder' | t"
             [value]="zoneSearch()"
             (input)="zoneSearch.set($any($event.target).value)"
           />
           @if (filterZones(zones()).length === 0) {
-            <p class="filter-empty">No zones match — clear search to see all.</p>
+            <p class="filter-empty">{{ 'common.noMatchSearch' | t:{ entity: ('zone.title' | t) } }}</p>
           }
-          <select id="zone-select" formControlName="zoneId" aria-label="Zone, value is id">
-            <option value="" disabled>Choose zone…</option>
+          <select id="zone-select" formControlName="zoneId" [attr.aria-label]="'common.zone' | t">
+            <option value="" disabled>{{ 'common.choose' | t:{ entity: ('common.zone' | t) } }}</option>
             @for (z of filterZones(zones()); track z.id) {
               <option [value]="z.id">{{ zoneOptionLabel(z) }}</option>
             }
@@ -72,19 +70,19 @@
           formControlName="manualZoneId"
           min="1"
           step="1"
-          placeholder="Zone id"
+          [placeholder]="'table.zoneId' | t"
           [readonly]="submitting()"
         />
-        <p class="hint-inline">No zones loaded — enter an existing zone id, or create zones first.</p>
+        <p class="hint-inline">{{ 'table.noZonesLoaded' | t }}</p>
       }
       @if (form.controls.zoneId.invalid && form.controls.zoneId.touched) {
-        <span class="err">Choose a zone.</span>
+        <span class="err">{{ 'table.chooseZone' | t }}</span>
       }
     </div>
 
     <div class="actions">
       <button type="submit" [disabled]="submitting() || !canSubmit()">
-        {{ submitting() ? 'Saving…' : 'Create table' }}
+        {{ submitting() ? ('common.saving' | t) : ('table.createTable' | t) }}
       </button>
     </div>
   </form>

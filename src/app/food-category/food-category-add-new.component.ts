@@ -5,12 +5,14 @@ import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 
 import type { NewFoodCategoryRequest } from '../food/food.model';
+import { LocaleService } from '../i18n/locale.service';
+import { TranslatePipe } from '../i18n/translate.pipe';
 import { FoodCategoryService } from './food-category.service';
 
 @Component({
   selector: 'app-food-category-add-new',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, TranslatePipe],
   templateUrl: './food-category-add-new.component.html',
   styleUrl: './food-category-add-new.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -19,6 +21,7 @@ export class FoodCategoryAddNewComponent {
   private readonly fb = inject(FormBuilder);
   private readonly foodCategoryService = inject(FoodCategoryService);
   private readonly router = inject(Router);
+  private readonly i18n = inject(LocaleService);
 
   readonly submitting = signal(false);
   readonly errorMessage = signal<string | null>(null);
@@ -70,8 +73,13 @@ export class FoodCategoryAddNewComponent {
       if (typeof err.error === 'string' && err.error.length > 0) {
         return err.error;
       }
-      return err.message || `Request failed (${err.status})`;
+      return (
+        err.message ||
+        this.i18n.translate('common.requestFailedHttp', { status: err.status })
+      );
     }
-    return 'Could not create category.';
+    return this.i18n.translate('common.couldNotCreate', {
+      entity: this.i18n.translate('foodCategory.entity'),
+    });
   }
 }

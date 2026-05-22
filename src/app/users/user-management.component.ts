@@ -6,12 +6,14 @@ import { finalize } from 'rxjs';
 
 import { JwtAuthService } from '../auth/jwt-auth.service';
 import type { PosUserRecord } from './users.service';
+import { LocaleService } from '../i18n/locale.service';
+import { TranslatePipe } from '../i18n/translate.pipe';
 import { UsersService } from './users.service';
 
 @Component({
   selector: 'app-user-management',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, TranslatePipe],
   templateUrl: './user-management.component.html',
   styleUrl: './user-management.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -21,6 +23,7 @@ export class UserManagementComponent {
   private readonly usersService = inject(UsersService);
   private readonly jwtAuth = inject(JwtAuthService);
   private readonly router = inject(Router);
+  private readonly i18n = inject(LocaleService);
 
   readonly loading = signal(false);
   readonly saving = signal(false);
@@ -83,13 +86,13 @@ export class UserManagementComponent {
           });
           this.reloadUsers();
         },
-        error: (err: unknown) => this.formError.set(this.formatHttpError(err, 'Could not create user.')),
+        error: (err: unknown) => this.formError.set(this.formatHttpError(err, this.i18n.translate('users.couldNotCreate'))),
       });
   }
 
   rolesLabel(roles?: string[] | null): string {
     if (!roles?.length) {
-      return '—';
+      return this.i18n.translate('common.emptyDash');
     }
     return roles.join(', ');
   }
@@ -100,7 +103,7 @@ export class UserManagementComponent {
       next: (updated) => {
         this.users.update((rows) => rows.map((r) => (r.id === updated.id ? { ...r, ...updated } : r)));
       },
-      error: (err: unknown) => this.listError.set(this.formatHttpError(err, 'Could not update user.')),
+      error: (err: unknown) => this.listError.set(this.formatHttpError(err, this.i18n.translate('users.couldNotUpdate'))),
     });
   }
 
@@ -114,10 +117,7 @@ export class UserManagementComponent {
   private formatHttpError(err: unknown, fallback: string): string {
     if (err instanceof HttpErrorResponse) {
       if (err.status === 404) {
-        const hint =
-          'Your API returned 404 for the users endpoint. Implement user REST APIs on the server ' +
-          '(see UsersService), or set provider POS_USERS_API_ROOT in app.config if the path differs from /api/users.';
-        return `${fallback} ${hint}`;
+        return `${fallback} ${this.i18n.translate('users.api404Hint')}`;
       }
       const body = err.error;
       if (typeof body === 'object' && body !== null && 'message' in body) {
@@ -129,7 +129,7 @@ export class UserManagementComponent {
       if (typeof err.error === 'string' && err.error.length > 0) {
         return err.error;
       }
-      return err.message || `Request failed (${err.status})`;
+      return err.message || this.i18n.translate('common.requestFailedHttp', { status: err.status });
     }
     return fallback;
   }
