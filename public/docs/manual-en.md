@@ -239,6 +239,12 @@ Guests order via QR at the table without staff login.
 
 Note any red error text and status code (e.g. `(500)`) and report to your IT contact.
 
+**Support contact:**
+
+- Email: [gogiekub@gmail.com](mailto:gogiekub@gmail.com)
+- Tel: [+66 0650946307](tel:+66650946307)
+- Facebook: [facebook.com/Rokkor](https://www.facebook.com/Rokkor)
+
 ---
 
 *Posfont POS — updated for backup, reports, and multilingual UI*
