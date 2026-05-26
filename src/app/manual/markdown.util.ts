@@ -130,9 +130,13 @@ function inline(text: string): string {
 function slug(text: string): string {
   return text
     .trim()
+    .normalize('NFC')
     .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s-]/gu, '')
-    .replace(/\s+/g, '-');
+    // Keep Thai letters and combining marks; \p{L} alone drops Thai vowel/tone marks.
+    .replace(/[^\p{L}\p{M}\p{N}\s-]/gu, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
 }
 
 function escapeHtml(text: string): string {
