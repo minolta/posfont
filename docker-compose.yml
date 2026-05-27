@@ -1,0 +1,11 @@
+services:
+  web:
+    container_name: posfont-web
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8888}:80"
+    environment:
+      API_BASE_URL: "${API_BASE_URL:-http://host.docker.internal:8080}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
