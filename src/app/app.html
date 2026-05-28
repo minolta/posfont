@@ -3,35 +3,48 @@
     <header class="app-header">
       <span class="brand">{{ title() }}</span>
       <nav [attr.aria-label]="'nav.main' | t">
-        <a routerLink="/orders" routerLinkActive="active">{{ 'nav.orders' | t }}</a>
-        <a routerLink="/orders/new" routerLinkActive="active">{{ 'nav.newOrder' | t }}</a>
-        <a routerLink="/foods" routerLinkActive="active">{{ 'nav.foods' | t }}</a>
-        <a routerLink="/foods/new" routerLinkActive="active">{{ 'nav.addFood' | t }}</a>
-        <a routerLink="/food-categories" routerLinkActive="active">{{ 'nav.categories' | t }}</a>
-        <a routerLink="/food-categories/new" routerLinkActive="active">{{ 'nav.newCategory' | t }}</a>
-        <a routerLink="/kitchens" routerLinkActive="active">{{ 'nav.kitchens' | t }}</a>
-        <a routerLink="/kitchens/prep" routerLinkActive="active">{{ 'nav.kitchenPrep' | t }}</a>
-        <a routerLink="/kitchens/new" routerLinkActive="active">{{ 'nav.addKitchen' | t }}</a>
-        <a routerLink="/zones" routerLinkActive="active">{{ 'nav.zones' | t }}</a>
-        <a routerLink="/zones/new" routerLinkActive="active">{{ 'nav.addZone' | t }}</a>
-        <a routerLink="/tables" routerLinkActive="active">{{ 'nav.tables' | t }}</a>
-        <a routerLink="/tables/new" routerLinkActive="active">{{ 'nav.addTable' | t }}</a>
-        <span class="nav-divider" aria-hidden="true"></span>
-        <a
-          routerLink="/reports"
-          routerLinkActive="active"
-          [routerLinkActiveOptions]="{ exact: false }"
-          >{{ 'nav.reports' | t }}</a
-        >
-        <a routerLink="/manual" routerLinkActive="active">{{ 'nav.manual' | t }}</a>
-        <span class="nav-divider" aria-hidden="true"></span>
-        @if (jwtAuth.isAuthenticated()) {
-          <a routerLink="/users" routerLinkActive="active">{{ 'nav.users' | t }}</a>
-          <button type="button" class="nav-button" (click)="logout()">{{ 'nav.signOut' | t }}</button>
-        } @else {
-          <a routerLink="/login" routerLinkActive="active">{{ 'nav.signIn' | t }}</a>
-        }
-        <app-lang-switch />
+        <div class="nav-desktop">
+          @for (link of navLinks(); track link.path) {
+            @if (link.dividerBefore) {
+              <span class="nav-divider" aria-hidden="true"></span>
+            }
+            <a
+              [routerLink]="link.path"
+              routerLinkActive="active"
+              [routerLinkActiveOptions]="{ exact: link.exact !== false }"
+              >{{ link.labelKey | t }}</a
+            >
+          }
+          <span class="nav-divider" aria-hidden="true"></span>
+          @if (jwtAuth.isAuthenticated()) {
+            <button type="button" class="nav-button" (click)="logout()">{{ 'nav.signOut' | t }}</button>
+          } @else {
+            <a routerLink="/login" routerLinkActive="active">{{ 'nav.signIn' | t }}</a>
+          }
+          <app-lang-switch />
+        </div>
+
+        <div class="nav-mobile">
+          <label class="nav-mobile-label" for="nav-mobile-select">{{ 'nav.menu' | t }}</label>
+          <select
+            id="nav-mobile-select"
+            class="nav-mobile-select"
+            [value]="navPath()"
+            (change)="onMobileNavChange($event)"
+          >
+            @for (link of navLinks(); track link.path) {
+              <option [value]="link.path">{{ link.labelKey | t }}</option>
+            }
+          </select>
+          @if (jwtAuth.isAuthenticated()) {
+            <button type="button" class="nav-button nav-button--compact" (click)="logout()">
+              {{ 'nav.signOut' | t }}
+            </button>
+          } @else {
+            <a routerLink="/login" routerLinkActive="active" class="nav-mobile-auth">{{ 'nav.signIn' | t }}</a>
+          }
+          <app-lang-switch />
+        </div>
       </nav>
     </header>
   }

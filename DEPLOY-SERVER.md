@@ -1,56 +1,115 @@
-# Deploy on 203.150.243.87:8888
+# Deploy Posfont Web
 
-## 1) Copy project to server
+## LAN — 192.168.88.5
 
 ```bash
-scp -r ./postfont2 <user>@203.150.243.87:/opt/postfont2
+bash deploy-192.168.88.5.sh ky
 ```
 
-## 2) SSH and prepare env
+Defaults:
+
+| Setting | Value |
+|---------|-------|
+| host | `192.168.88.5` |
+| dir | `/home/ky/opt/posfont` |
+| port | `888` |
+| api | `http://192.168.88.5:8080` |
+
+Open: `http://192.168.88.5:888`
+
+---
+
+## Public — 203.150.243.87
+
+## Quick deploy (same style as POS API)
 
 ```bash
-ssh <user>@203.150.243.87
-cd /opt/postfont2
+bash deploy-203.150.243.87.sh root
+```
+
+Or one SSH step for load + run:
+
+```bash
+bash deploy-posfont-203.150.243.87.sh root
+```
+
+### Arguments
+
+```bash
+bash deploy-203.150.243.87.sh <host-user> [host-dir] [app-port] [api-base-url]
+```
+
+| Arg | Default | Example |
+|-----|---------|---------|
+| host-user | *(required)* | `root` |
+| host-dir | `/home/root/posfont` | `/home/root/posfont` |
+| app-port | `888` | `888` |
+| api-base-url | `http://203.150.243.87:8080` | `http://203.150.243.87:8080` |
+
+Example with custom path and port:
+
+```bash
+bash deploy-203.150.243.87.sh root /home/root/posfont 888
+```
+
+Verify:
+
+- Browser: `http://203.150.243.87:888`
+- Remote logs: `ssh root@203.150.243.87 "docker logs -f posfont-web"`
+
+---
+
+## Save / Load scripts (alternative)
+
+```bash
+bash scripts/docker-save.sh
+export SERVER=root@203.150.243.87
+export REMOTE_DIR=/home/root/posfont
+bash scripts/docker-upload.sh
+```
+
+On server:
+
+```bash
+cd /home/root/posfont
 cp .env.example .env
+bash scripts/docker-load.sh
 ```
 
-Edit `.env` if your API is not on the same host:
+---
 
-```env
-APP_PORT=8888
-API_BASE_URL=http://host.docker.internal:8080
-```
-
-## 3) Start app
+## Build on server (docker compose)
 
 ```bash
+scp -r ./postfont2 root@203.150.243.87:/home/root/posfont-src
+ssh root@203.150.243.87
+cd /home/root/posfont-src
+cp .env.example .env
 docker compose up -d --build
-docker compose ps
 ```
 
-## 4) Open firewall port 8888
+---
 
-If using `ufw`:
+## Run on boot
+
+Deploy scripts use `--restart always` and run `systemctl enable docker` on the server so `posfont-web` starts after reboot.
+
+For an already-running container without redeploying:
 
 ```bash
-sudo ufw allow 8888/tcp
-sudo ufw status
+ssh ky@192.168.88.5 'bash -s' < scripts/enable-boot-restart.sh
 ```
 
-If using `firewalld`:
+Or on the server:
 
 ```bash
-sudo firewall-cmd --permanent --add-port=8888/tcp
-sudo firewall-cmd --reload
-sudo firewall-cmd --list-ports
+sudo systemctl enable docker
+docker update --restart always posfont-web
 ```
 
-## 5) Verify
+---
 
-- Browser: `http://203.150.243.87:8888`
-- Logs: `docker compose logs -f web`
-
-## Notes
-
-- Container is configured with `restart: unless-stopped` for auto-restart.
-- API requests are proxied by Nginx from `/api/*` to `API_BASE_URL`.
+- Container name: `posfont-web`
+- Image: `posfont-web:latest`
+- API requests proxied from `/api/*` to `API_BASE_URL` (Nginx inside container)
+- POS API on same host should run on port `8080` (see `../api/pos/deploy-203.150.243.87.sh`)

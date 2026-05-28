@@ -1,7 +1,8 @@
+# Run a pre-loaded image (no build on server). Use after `docker load`.
 services:
   web:
     container_name: posfont-web
-    build: .
+    image: posfont-web:latest
     restart: always
     ports:
       - "${APP_PORT:-888}:80"

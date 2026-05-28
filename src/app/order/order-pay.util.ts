@@ -159,6 +159,7 @@ export function mergeOrderRequestPaymentFromPosOrder(
 export function orderLineRequestToWire(line: OrderLineRequest): Record<string, unknown> {
   const row: Record<string, unknown> = {
     foodId: line.foodId,
+    food_id: line.foodId,
     quantity: line.quantity,
   };
   if (line.status != null) {
@@ -182,6 +183,7 @@ export function orderLineRequestToWire(line: OrderLineRequest): Record<string, u
 export function orderRequestToWireBody(body: OrderRequest): Record<string, unknown> {
   const out: Record<string, unknown> = {
     tableId: body.tableId,
+    table_id: body.tableId,
     orderDate: body.orderDate,
     complateOrder: body.complateOrder,
     complateOrderDate: body.complateOrderDate,

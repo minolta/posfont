@@ -22,6 +22,7 @@ export const th: Record<EnTranslationKey, string> = {
   'nav.signOut': 'ออกจากระบบ',
   'nav.signIn': 'เข้าสู่ระบบ',
   'nav.main': 'เมนูหลัก',
+  'nav.menu': 'เมนู',
 
   'common.loading': 'กำลังโหลด…',
   'common.saving': 'กำลังบันทึก…',
@@ -450,6 +451,8 @@ export const th: Record<EnTranslationKey, string> = {
   'order.linePicker.billClosed': 'บิลนี้ปิดแล้ว',
   'order.linePicker.couldNotSend': 'ส่งออเดอร์ไม่ได้ ลองอีกครั้งหรือถามพนักงาน',
   'order.tableHasOpenOrder': 'โต๊ะนี้มีออเดอร์ค้างชำระอยู่แล้ว กรุณาชำระหรือยกเลิกก่อน',
+  'order.invalidTableOrFood':
+    'โต๊ะหรือเมนูที่เลือกไม่มีในระบบแล้ว กรุณารีเฟรชหน้าแล้วเลือกใหม่',
 
   'payment.promptPay': 'PromptPay',
   'payment.thb': 'THB',

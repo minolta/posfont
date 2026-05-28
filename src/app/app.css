@@ -33,17 +33,79 @@
 .brand {
   font-weight: 600;
   letter-spacing: -0.02em;
+  flex-shrink: 0;
 }
 
 .app-header nav {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.nav-desktop {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.35rem;
 }
 
+.nav-mobile {
+  display: none;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  max-width: 100%;
+}
+
+.nav-mobile-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.nav-mobile-select {
+  flex: 1;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0.45rem 0.55rem;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fafafa;
+  font-size: 0.9rem;
+}
+
+.nav-mobile-select option {
+  color: #111;
+  background: #fff;
+}
+
+.nav-mobile-auth {
+  color: #e5e5e5;
+  text-decoration: none;
+  font-size: 0.85rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.nav-mobile-auth:hover,
+.nav-mobile-auth.active {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+}
+
 .app-header app-lang-switch {
   margin-left: 0.25rem;
+  flex-shrink: 0;
 }
 
 .app-header nav a {
@@ -81,6 +143,13 @@
   color: #fafafa;
   font-size: 0.85rem;
   cursor: pointer;
+  white-space: nowrap;
+}
+
+.app-header .nav-button--compact {
+  margin-left: 0;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.8rem;
 }
 
 .app-header .nav-button:hover {
@@ -90,4 +159,24 @@
 .app-main {
   flex: 1;
   padding: 0;
+}
+
+@media (max-width: 960px) {
+  .app-header {
+    flex-wrap: wrap;
+    padding: 0.55rem 0.75rem;
+  }
+
+  .nav-desktop {
+    display: none;
+  }
+
+  .nav-mobile {
+    display: flex;
+  }
+
+  .app-header nav {
+    flex-basis: 100%;
+    order: 3;
+  }
 }

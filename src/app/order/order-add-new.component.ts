@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, effect, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import {
   FormArray,
@@ -9,14 +9,15 @@ import {
   Validators,
 } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { catchError, finalize, forkJoin, map, of, switchMap } from 'rxjs';
+import { catchError, finalize, of, switchMap } from 'rxjs';
 
+import { entityIdNumber, sameEntityId } from '../common/entity-id.util';
 import { foodBlocksOrderLines, type Food } from '../food/food.model';
 import { FoodService } from '../food/food.service';
 import type { PosTable } from '../table/table.model';
 import { TableService } from '../table/table.service';
 import { defaultDatetimeLocal, normalizeLocalDateTimeForApi } from './order-datetime.util';
-import { mergeFoodsFromApis, mergeTablesFromApis, foodPickerLabel, tablePickerLabel } from './order-merge.util';
+import { foodPickerLabel, tablePickerLabel } from './order-merge.util';
 import { trimNewLineNote } from './order-line-note.util';
 import type { OrderRequest } from './order.model';
 import { LocaleService } from '../i18n/locale.service';
@@ -48,24 +49,12 @@ export class OrderAddNewComponent {
   readonly foodSearch = signal('');
 
   readonly tables = toSignal(
-    forkJoin({
-      tablesApi: this.tableService.getTables().pipe(catchError(() => of([] as PosTable[]))),
-      ordersApi: this.orderService.getOrders().pipe(catchError(() => of([]))),
-    }).pipe(
-      map(({ tablesApi, ordersApi }) => mergeTablesFromApis(tablesApi, ordersApi)),
-      catchError(() => of([] as PosTable[])),
-    ),
+    this.tableService.getTables().pipe(catchError(() => of([] as PosTable[]))),
     { initialValue: [] as PosTable[] },
   );
 
   readonly foods = toSignal(
-    forkJoin({
-      foodsApi: this.foodService.getFoods().pipe(catchError(() => of([] as Food[]))),
-      ordersApi: this.orderService.getOrders().pipe(catchError(() => of([]))),
-    }).pipe(
-      map(({ foodsApi, ordersApi }) => mergeFoodsFromApis(foodsApi, ordersApi)),
-      catchError(() => of([] as Food[])),
-    ),
+    this.foodService.getFoods().pipe(catchError(() => of([] as Food[]))),
     { initialValue: [] as Food[] },
   );
 
@@ -83,6 +72,9 @@ export class OrderAddNewComponent {
 
   constructor() {
     this.restoreDraft();
+    effect(() => {
+      this.pruneStaleSelections(this.tables(), this.foods());
+    });
     this.route.queryParamMap
       .pipe(takeUntilDestroyed())
       .subscribe((qpm) => {
@@ -131,9 +123,9 @@ export class OrderAddNewComponent {
 
   linePickerQueryParams(): Record<string, string | null> {
     const raw = this.form.getRawValue();
-    const tableId = Number(raw.tableId || raw.manualTableId || '');
-    const idOk = Number.isFinite(tableId) && tableId > 0;
-    const picked = idOk ? this.tables().find((t) => t.id === tableId) : undefined;
+    const tableId = this.resolveTableId(raw.tableId, raw.manualTableId, this.tables());
+    const idOk = tableId != null;
+    const picked = idOk ? this.tables().find((t) => sameEntityId(t.id, tableId)) : undefined;
     const code = (picked?.code ?? '').trim();
     return {
       tableId: idOk ? String(tableId) : null,
@@ -161,15 +153,15 @@ export class OrderAddNewComponent {
   filterTables(ts: PosTable[]): PosTable[] {
     const q = this.tableSearch().trim().toLowerCase();
     const raw = this.form.getRawValue().tableId;
-    const selId = Number(raw);
+    const selId = entityIdNumber(raw);
     const base = !q
       ? ts
       : ts.filter((t) => tablePickerLabel(t).toLowerCase().includes(q));
-    if (!Number.isFinite(selId) || selId < 1) {
+    if (selId == null) {
       return base;
     }
-    const picked = ts.find((t) => t.id === selId);
-    if (!picked || base.some((t) => t.id === selId)) {
+    const picked = ts.find((t) => sameEntityId(t.id, selId));
+    if (!picked || base.some((t) => sameEntityId(t.id, selId))) {
       return base;
     }
     return [picked, ...base];
@@ -177,18 +169,18 @@ export class OrderAddNewComponent {
 
   filterFoodsForLine(fs: Food[], foodIdRaw: string | undefined | null): Food[] {
     const q = this.foodSearch().trim().toLowerCase();
-    const selId = Number(foodIdRaw ?? '');
+    const selId = entityIdNumber(foodIdRaw);
     const base = !q
       ? fs.filter((f) => !foodBlocksOrderLines(f))
       : fs.filter(
           (f) =>
             !foodBlocksOrderLines(f) && foodPickerLabel(f).toLowerCase().includes(q),
         );
-    if (!Number.isFinite(selId) || selId < 1) {
+    if (selId == null) {
       return base;
     }
-    const picked = fs.find((f) => f.id === selId);
-    if (!picked || base.some((f) => f.id === selId)) {
+    const picked = fs.find((f) => sameEntityId(f.id, selId));
+    if (!picked || base.some((f) => sameEntityId(f.id, selId))) {
       return base;
     }
     return [picked, ...base];
@@ -201,22 +193,18 @@ export class OrderAddNewComponent {
     }
     const ts = this.tables();
     const { tableId, manualTableId } = f.getRawValue();
-    const tid =
-      ts.length > 0 ? Number(tableId) : Number((manualTableId ?? '').toString().trim());
-    if (!Number.isFinite(tid) || tid < 1) {
+    const tid = this.resolveTableId(tableId, manualTableId, ts);
+    if (tid == null) {
       return false;
     }
     const fs = this.foods();
     for (const g of this.lines.controls as FormGroup[]) {
       const q = Math.floor(Number(g.get('quantity')?.value));
-      const fid =
-        fs.length > 0
-          ? Number(g.get('foodId')?.value)
-          : Number((g.get('manualFoodId')?.value ?? '').toString().trim());
-      if (!Number.isFinite(fid) || fid < 1 || !Number.isFinite(q) || q < 1) {
+      const fid = this.resolveLineFoodId(g, fs);
+      if (fid == null || !Number.isFinite(q) || q < 1) {
         return false;
       }
-      const foodMeta = fs.length > 0 ? fs.find((fx) => fx.id === fid) : undefined;
+      const foodMeta = fs.length > 0 ? fs.find((fx) => sameEntityId(fx.id, fid)) : undefined;
       if (foodMeta && foodBlocksOrderLines(foodMeta)) {
         return false;
       }
@@ -236,14 +224,17 @@ export class OrderAddNewComponent {
     const v = this.form.getRawValue();
     const ts = this.tables();
     const fs = this.foods();
-    const tableId =
-      ts.length > 0 ? Number(v.tableId) : Number((v.manualTableId ?? '').toString().trim());
+    const tableId = this.resolveTableId(v.tableId, v.manualTableId, ts);
+    if (tableId == null) {
+      this.errorMessage.set(this.i18n.translate('order.invalidTableOrFood'));
+      return;
+    }
     const complateRaw = (v.complateOrderDate ?? '').toString().trim();
     const lines = (this.lines.controls as FormGroup[]).map((g) => {
-      const foodId =
-        fs.length > 0
-          ? Number(g.get('foodId')?.value)
-          : Number((g.get('manualFoodId')?.value ?? '').toString().trim());
+      const foodId = this.resolveLineFoodId(g, fs);
+      if (foodId == null) {
+        return null;
+      }
       const quantity = Math.max(1, Math.floor(Number(g.get('quantity')?.value)));
       const note = trimNewLineNote(g.get('note')?.value);
       return {
@@ -252,6 +243,10 @@ export class OrderAddNewComponent {
         ...(note !== undefined ? { note } : {}),
       };
     });
+    if (lines.some((ln) => ln == null)) {
+      this.errorMessage.set(this.i18n.translate('order.invalidTableOrFood'));
+      return;
+    }
     const orderNote = (v.orderNote ?? '').toString().trim().slice(0, 2000);
     const body: OrderRequest = {
       tableId,
@@ -260,7 +255,7 @@ export class OrderAddNewComponent {
       complateOrderDate:
         complateRaw.length > 0 ? normalizeLocalDateTimeForApi(complateRaw) : null,
       cancel: !!v.cancel,
-      lines,
+      lines: lines as OrderRequest['lines'],
       version: Number(v.version),
       ...(orderNote.length > 0 ? { note: orderNote } : {}),
     };
@@ -270,7 +265,7 @@ export class OrderAddNewComponent {
       .pipe(
         switchMap((orders) => {
           const hasOpenUnpaidOnSameTable = orders.some(
-            (o) => o.table?.id === tableId && !o.paid && !o.cancel,
+            (o) => sameEntityId(o.table?.id, tableId) && !o.paid && !o.cancel,
           );
           if (hasOpenUnpaidOnSameTable) {
             this.errorMessage.set(this.i18n.translate('order.tableHasOpenOrder'));
@@ -302,8 +297,8 @@ export class OrderAddNewComponent {
       const v = g.getRawValue();
       const foodIdText = String(v.foodId ?? '').trim();
       const manualIdText = String(v.manualFoodId ?? '').trim();
-      const fid = Number(foodIdText || manualIdText);
-      return Number.isFinite(fid) && fid === foodId;
+      const fid = entityIdNumber(foodIdText || manualIdText);
+      return fid != null && fid === foodId;
     });
     if (existingIdx >= 0) {
       const existing = this.lines.at(existingIdx) as FormGroup;
@@ -422,17 +417,86 @@ export class OrderAddNewComponent {
     }
   }
 
+  private resolveTableId(
+    tableIdRaw: unknown,
+    manualTableIdRaw: unknown,
+    ts: PosTable[],
+  ): number | null {
+    if (ts.length > 0) {
+      const id = entityIdNumber(tableIdRaw) ?? entityIdNumber(manualTableIdRaw);
+      if (id == null || !ts.some((t) => sameEntityId(t.id, id))) {
+        return null;
+      }
+      return id;
+    }
+    return entityIdNumber(manualTableIdRaw);
+  }
+
+  private resolveLineFoodId(g: FormGroup, fs: Food[]): number | null {
+    const v = g.getRawValue();
+    if (fs.length > 0) {
+      const id = entityIdNumber(v.foodId) ?? entityIdNumber(v.manualFoodId);
+      if (id == null || !fs.some((f) => sameEntityId(f.id, id))) {
+        return null;
+      }
+      return id;
+    }
+    return entityIdNumber(v.manualFoodId);
+  }
+
+  private pruneStaleSelections(ts: PosTable[], fs: Food[]): void {
+    const raw = this.form.getRawValue();
+    const patch: {
+      tableId?: string;
+      manualTableId?: string;
+    } = {};
+    if (ts.length > 0) {
+      const tableId = this.resolveTableId(raw.tableId, raw.manualTableId, ts);
+      if (tableId == null && (entityIdNumber(raw.tableId) != null || entityIdNumber(raw.manualTableId) != null)) {
+        patch.tableId = '';
+        patch.manualTableId = '';
+      }
+    }
+    if (Object.keys(patch).length > 0) {
+      this.form.patchValue(patch, { emitEvent: false });
+    }
+    if (fs.length > 0) {
+      for (const g of this.lines.controls as FormGroup[]) {
+        const v = g.getRawValue();
+        const foodId = this.resolveLineFoodId(g, fs);
+        if (
+          foodId == null &&
+          (entityIdNumber(v.foodId) != null || entityIdNumber(v.manualFoodId) != null)
+        ) {
+          g.patchValue({ foodId: '', manualFoodId: '' }, { emitEvent: false });
+        }
+      }
+    }
+  }
+
   private formatHttpError(err: unknown): string {
     if (err instanceof HttpErrorResponse) {
       const body = err.error;
+      let msg = '';
       if (typeof body === 'object' && body !== null && 'message' in body) {
         const m = (body as { message?: unknown }).message;
         if (typeof m === 'string') {
-          return m;
+          msg = m;
         }
+      } else if (typeof err.error === 'string' && err.error.length > 0) {
+        msg = err.error;
       }
-      if (typeof err.error === 'string' && err.error.length > 0) {
-        return err.error;
+      const lower = msg.toLowerCase();
+      if (
+        lower.includes('still referenced elsewhere') ||
+        lower.includes('missing or was deleted') ||
+        (lower.includes('table id') && lower.includes('not found')) ||
+        (lower.includes('food id') && lower.includes('not found'))
+      ) {
+        return this.i18n.translate('order.invalidTableOrFood');
+      }
+      if (msg) {
+        return msg;
       }
       return err.message || this.i18n.translate('common.requestFailedHttp', { status: err.status });
     }

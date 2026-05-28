@@ -20,6 +20,7 @@ export const en = {
   'nav.signOut': 'Sign out',
   'nav.signIn': 'Sign in',
   'nav.main': 'Main',
+  'nav.menu': 'Menu',
 
   'common.loading': 'Loading…',
   'common.saving': 'Saving…',
@@ -459,6 +460,8 @@ export const en = {
   'order.linePicker.couldNotSend': 'Could not send order. Try again or ask staff.',
   'order.tableHasOpenOrder':
     'This table already has an unpaid open order. Please pay/cancel it first.',
+  'order.invalidTableOrFood':
+    'Selected table or menu item is no longer available. Refresh the page and pick again.',
 
   'payment.promptPay': 'PromptPay',
   'payment.thb': 'THB',
