@@ -40,6 +40,11 @@ export interface Food {
   kitchen: Kitchen | null;
   foodCategory: FoodCategory | null;
   version: number;
+  /**
+   * When true, this item cannot be added as order lines (kitchen-only / discontinued display, etc.).
+   * Alias keys: `block_order_line` on some APIs.
+   */
+  blockOrderLine?: boolean | null;
 }
 
 /** Body for `POST /api/foods` and `PUT /api/foods/{id}` (`FoodRequest`). */
@@ -50,4 +55,43 @@ export interface FoodRequest {
   kitchenId: number;
   foodCategoryId: number;
   version: number;
+  /** Omit or false to allow ordering; true blocks new/edited order lines from this food. */
+  blockOrderLine?: boolean;
+}
+
+/** Normalizes booleans — JSON aliases from Java / legacy payloads. */
+export function foodBlocksOrderLines(food: Food): boolean {
+  const r = food as unknown as Record<string, unknown>;
+  const v =
+    food.blockOrderLine ?? r['block_order_line'] ?? r['blockOrderLines'];
+  return v === true || v === 'true' || v === 1 || v === '1';
+}
+
+/** Builds a PUT body from current server row and optional optimistic field overrides (e.g. list toggle). */
+export function foodUpdateRequestSnapshot(
+  food: Food,
+  overrides: Partial<Pick<FoodRequest, 'blockOrderLine'>> = {},
+): FoodRequest {
+  const kid = food.kitchen?.id;
+  const cid = food.foodCategory?.id;
+  if (
+    kid == null ||
+    cid == null ||
+    !Number.isFinite(kid) ||
+    kid < 1 ||
+    !Number.isFinite(cid) ||
+    cid < 1
+  ) {
+    throw new Error('Food must have kitchen and category for save.');
+  }
+  const blocked = overrides.blockOrderLine ?? foodBlocksOrderLines(food);
+  return {
+    code: food.code,
+    name: (food.name ?? food.code ?? '').trim(),
+    basePrice: food.basePrice,
+    kitchenId: kid,
+    foodCategoryId: cid,
+    version: food.version,
+    blockOrderLine: blocked,
+  };
 }

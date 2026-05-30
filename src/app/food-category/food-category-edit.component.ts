@@ -6,12 +6,14 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { EMPTY, catchError, finalize, map, switchMap } from 'rxjs';
 
 import type { FoodCategoryRequest } from '../food/food.model';
+import { LocaleService } from '../i18n/locale.service';
+import { TranslatePipe } from '../i18n/translate.pipe';
 import { FoodCategoryService } from './food-category.service';
 
 @Component({
   selector: 'app-food-category-edit',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, TranslatePipe],
   templateUrl: './food-category-edit.component.html',
   styleUrl: './food-category-edit.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -21,6 +23,7 @@ export class FoodCategoryEditComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly foodCategoryService = inject(FoodCategoryService);
+  private readonly i18n = inject(LocaleService);
 
   readonly loading = signal(true);
   readonly loadError = signal<string | null>(null);
@@ -45,7 +48,11 @@ export class FoodCategoryEditComponent {
         switchMap((id) => {
           if (!Number.isFinite(id) || id < 1) {
             this.loading.set(false);
-            this.loadError.set('Invalid category id.');
+            this.loadError.set(
+              this.i18n.translate('common.invalidId', {
+                entity: this.i18n.translate('foodCategory.entity'),
+              }),
+            );
             this.categoryId.set(null);
             return EMPTY;
           }
@@ -54,7 +61,11 @@ export class FoodCategoryEditComponent {
           this.loadError.set(null);
           return this.foodCategoryService.getFoodCategoryById(id).pipe(
             catchError(() => {
-              this.loadError.set('Could not load category.');
+              this.loadError.set(
+                this.i18n.translate('common.couldNotLoad', {
+                  entity: this.i18n.translate('foodCategory.entity'),
+                }),
+              );
               return EMPTY;
             }),
             finalize(() => this.loading.set(false)),
@@ -64,7 +75,11 @@ export class FoodCategoryEditComponent {
       )
       .subscribe((cat) => {
         if (!cat) {
-          this.loadError.set('Category not found.');
+          this.loadError.set(
+            this.i18n.translate('common.notFound', {
+              entity: this.i18n.translate('foodCategory.entity'),
+            }),
+          );
           return;
         }
         this.loadError.set(null);
@@ -117,8 +132,13 @@ export class FoodCategoryEditComponent {
       if (typeof err.error === 'string' && err.error.length > 0) {
         return err.error;
       }
-      return err.message || `Request failed (${err.status})`;
+      return (
+        err.message ||
+        this.i18n.translate('common.requestFailedHttp', { status: err.status })
+      );
     }
-    return 'Could not save category.';
+    return this.i18n.translate('common.couldNotSave', {
+      entity: this.i18n.translate('foodCategory.entity'),
+    });
   }
 }

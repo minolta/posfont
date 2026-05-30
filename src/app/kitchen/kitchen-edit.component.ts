@@ -5,13 +5,15 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { EMPTY, catchError, finalize, map, switchMap } from 'rxjs';
 
+import { LocaleService } from '../i18n/locale.service';
+import { TranslatePipe } from '../i18n/translate.pipe';
 import type { KitchenRequest } from './kitchen.model';
 import { KitchenService } from './kitchen.service';
 
 @Component({
   selector: 'app-kitchen-edit',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, TranslatePipe],
   templateUrl: './kitchen-edit.component.html',
   styleUrl: './kitchen-edit.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -21,6 +23,7 @@ export class KitchenEditComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly kitchenService = inject(KitchenService);
+  private readonly i18n = inject(LocaleService);
 
   readonly loading = signal(true);
   readonly loadError = signal<string | null>(null);
@@ -48,7 +51,11 @@ export class KitchenEditComponent {
         switchMap((id) => {
           if (!Number.isFinite(id) || id < 1) {
             this.loading.set(false);
-            this.loadError.set('Invalid kitchen id.');
+            this.loadError.set(
+              this.i18n.translate('common.invalidId', {
+                entity: this.i18n.translate('kitchen.entity'),
+              }),
+            );
             this.kitchenId.set(null);
             return EMPTY;
           }
@@ -57,7 +64,11 @@ export class KitchenEditComponent {
           this.loadError.set(null);
           return this.kitchenService.getKitchenById(id).pipe(
             catchError(() => {
-              this.loadError.set('Could not load kitchen.');
+              this.loadError.set(
+                this.i18n.translate('common.couldNotLoad', {
+                  entity: this.i18n.translate('kitchen.entity'),
+                }),
+              );
               return EMPTY;
             }),
             finalize(() => this.loading.set(false)),
@@ -67,7 +78,11 @@ export class KitchenEditComponent {
       )
       .subscribe((kitchen) => {
         if (!kitchen) {
-          this.loadError.set('Kitchen not found.');
+          this.loadError.set(
+            this.i18n.translate('common.notFound', {
+              entity: this.i18n.translate('kitchen.entity'),
+            }),
+          );
           return;
         }
         this.loadError.set(null);
@@ -120,8 +135,13 @@ export class KitchenEditComponent {
       if (typeof err.error === 'string' && err.error.length > 0) {
         return err.error;
       }
-      return err.message || `Request failed (${err.status})`;
+      return (
+        err.message ||
+        this.i18n.translate('common.requestFailedHttp', { status: err.status })
+      );
     }
-    return 'Could not save kitchen.';
+    return this.i18n.translate('common.couldNotSave', {
+      entity: this.i18n.translate('kitchen.entity'),
+    });
   }
 }

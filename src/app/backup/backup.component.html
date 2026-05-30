@@ -1,0 +1,145 @@
+<div class="backup-page">
+  <a routerLink="/reports/daily" class="back">{{ 'backup.backDaily' | t }}</a>
+
+  <header class="backup-head">
+    <h1>{{ 'backup.title' | t }}</h1>
+    <p class="hint">{{ 'backup.hint' | t }}</p>
+  </header>
+
+  @if (error(); as er) {
+    <p class="error-banner" role="alert">{{ er }}</p>
+  }
+
+  <div class="card">
+    <h2 class="card-title">{{ 'backup.export' | t }}</h2>
+
+    <div class="export-order-dates">
+      <div class="export-range-head">
+        <span class="export-range-title">{{ 'backup.ordersByDate' | t }}</span>
+        <button
+          type="button"
+          class="btn-all-orders"
+          [disabled]="exporting()"
+          (click)="clearOrdersExportRange()"
+        >
+          {{ 'backup.allOrders' | t }}
+        </button>
+      </div>
+      <div class="export-range-row">
+        <label class="date-field">
+          <span>{{ 'backup.from' | t }}</span>
+          <input
+            type="date"
+            class="date-input"
+            [value]="ordersExportFrom()"
+            [disabled]="exporting()"
+            (input)="ordersExportFromInput($event)"
+          />
+        </label>
+        <label class="date-field">
+          <span>{{ 'backup.to' | t }}</span>
+          <input
+            type="date"
+            class="date-input"
+            [value]="ordersExportTo()"
+            [disabled]="exporting()"
+            (input)="ordersExportToInput($event)"
+          />
+        </label>
+      </div>
+      <p class="hint-inline-range">{{ 'backup.rangeHint' | t }}</p>
+    </div>
+
+    <button type="button" class="btn-primary" [disabled]="exporting()" (click)="createBackup()">
+      {{ exporting() ? ('backup.creating' | t) : ('backup.create' | t) }}
+    </button>
+
+    @if (lastExport(); as ex) {
+      <dl class="result">
+        <div>
+          <dt>{{ 'backup.file' | t }}</dt>
+          <dd class="mono">{{ ex.fileName }}</dd>
+        </div>
+        <div>
+          <dt>{{ 'backup.size' | t }}</dt>
+          <dd class="mono">{{ formatBytes(ex.bytes) }}</dd>
+        </div>
+        <div>
+          <dt>{{ 'backup.ordersInSnapshot' | t }}</dt>
+          <dd class="mono">{{ ex.ordersExported }}</dd>
+        </div>
+        @if (ex.ordersFromDate ?? ex.ordersToDate) {
+          <div class="full">
+            <dt>{{ 'backup.orderDates' | t }}</dt>
+            <dd class="mono">
+              {{ ex.ordersFromDate ?? ('common.emptyDash' | t) }} … {{ ex.ordersToDate ?? ('common.emptyDash' | t) }}
+            </dd>
+          </div>
+        }
+        @if (ex.message) {
+          <div class="full">
+            <dt>{{ 'backup.note' | t }}</dt>
+            <dd>{{ ex.message }}</dd>
+          </div>
+        }
+      </dl>
+      <button type="button" class="btn-secondary" [disabled]="downloading() || exporting()" (click)="downloadLast()">
+        {{ downloading() ? ('backup.downloading' | t) : ('backup.downloadZip' | t) }}
+      </button>
+    }
+  </div>
+
+  <div class="card card-import">
+    <h2 class="card-title">{{ 'backup.import' | t }}</h2>
+    <p class="warn-box">{{ 'backup.importWarn' | t }}</p>
+
+    <label class="pick-label">
+      <span class="label-text">{{ 'backup.backupFile' | t }}</span>
+      <input
+        #importFile
+        type="file"
+        accept=".zip,.json,application/zip,application/json"
+        class="file-input"
+        [disabled]="importing() || exporting()"
+        (change)="onImportFileChange($event)"
+      />
+    </label>
+    @if (pendingImportFileName(); as name) {
+      <p class="file-picked mono">{{ name }}</p>
+    }
+
+    <label class="ack">
+      <input
+        type="checkbox"
+        [checked]="importAck()"
+        [disabled]="importing() || exporting()"
+        (change)="toggleImportAck($any($event.target).checked)"
+      />
+      <span>{{ 'backup.importAck' | t }}</span>
+    </label>
+
+    <button
+      type="button"
+      class="btn-danger"
+      [disabled]="!canImport()"
+      (click)="importBackup()"
+    >
+      {{ importing() ? ('backup.importing' | t) : ('backup.importReplace' | t) }}
+    </button>
+
+    @if (importResult(); as ir) {
+      <div class="import-done" role="status">
+        <p><strong>{{ ir.message }}</strong></p>
+        <ul class="counts mono">
+          <li>{{ 'backup.zonesRestored' | t }}: {{ ir.zonesRestored }}</li>
+          <li>{{ 'backup.printersRestored' | t }}: {{ ir.printersRestored }}</li>
+          <li>{{ 'backup.categoriesRestored' | t }}: {{ ir.foodCategoriesRestored }}</li>
+          <li>{{ 'backup.kitchensRestored' | t }}: {{ ir.kitchensRestored }}</li>
+          <li>{{ 'backup.tablesRestored' | t }}: {{ ir.tablesRestored }}</li>
+          <li>{{ 'backup.foodsRestored' | t }}: {{ ir.foodsRestored }}</li>
+          <li>{{ 'backup.ordersRestored' | t }}: {{ ir.ordersRestored }}</li>
+        </ul>
+      </div>
+    }
+  </div>
+</div>

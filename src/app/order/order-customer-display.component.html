@@ -1,0 +1,90 @@
+<div class="customer-shell">
+  <div class="customer-lang-bar">
+    <app-lang-switch class="lang-switch--light" />
+  </div>
+  @if (displaySession.orderId() === null) {
+    <div class="waiting-card">
+      <h1 class="customer-title">{{ 'display.title' | t }}</h1>
+      <p class="status">{{ 'display.waitingCashier' | t }}</p>
+      <p class="hint-foot">{{ 'display.leaveOpen' | t }}</p>
+      <button type="button" class="btn-soft" (click)="refreshNow()">{{ 'display.checkAgain' | t }}</button>
+    </div>
+  } @else if (initialLoading()) {
+    <p class="status" role="status">{{ 'common.loading' | t }}</p>
+  } @else if (order(); as o) {
+    <header class="customer-head">
+      <h1 class="customer-title">{{ 'display.yourOrder' | t }}</h1>
+      <p class="order-no mono">{{ o.orderNo }}</p>
+      @if (o.table; as tbl) {
+        <p class="meta">
+          {{ 'common.table' | t }}
+          @if (tbl.code && tbl.code.trim() !== '') {
+            <span class="mono">{{ tbl.code }}</span>
+          } @else if (tbl.id != null) {
+            <span class="mono">#{{ tbl.id }}</span>
+          }
+        </p>
+      }
+    </header>
+
+    @if (orderNote(o); as onote) {
+      <p class="order-note-banner" role="note">{{ onote }}</p>
+    }
+
+    @if (o.cancel) {
+      <p class="banner banner-cancel" role="status">{{ 'display.orderCancelled' | t }}</p>
+    } @else if (o.paid) {
+      <div class="banner banner-paid" role="status">
+        <p class="paid-msg">{{ 'display.thankYouPaid' | t }}</p>
+        <p class="paid-detail">{{ 'display.paymentLabel' | t }} {{ paidMethod(o) }}</p>
+        <p class="paid-detail mono">{{ 'display.totalThb' | t:{ amount: (payableTotal(o) | number: '1.2-2') ?? '' } }}</p>
+      </div>
+    }
+
+    <div
+      class="customer-body"
+      [class.customer-body--with-qr]="!o.cancel && !o.paid && payableTotal(o) > 0"
+    >
+      <div class="customer-body-primary">
+        <section class="lines-section" [attr.aria-label]="'display.orderLines' | t">
+          <h2 class="section-title">{{ 'display.items' | t }}</h2>
+          <ul class="line-list">
+            @for (ln of activeLines(o); track ln.id ?? $index) {
+              <li class="line-item">
+                <span class="qty mono">{{ ln.quantity }}×</span>
+                <span class="name">{{ lineLabel(ln) }}</span>
+                <span class="line-total mono">{{ ln.quantity * ln.unitPrice | number: '1.2-2' }}</span>
+              </li>
+            } @empty {
+              <li class="empty">{{ 'display.noItems' | t }}</li>
+            }
+          </ul>
+        </section>
+
+        <section class="total-section" [attr.aria-label]="'display.amountDue' | t">
+          <span class="total-label">{{ 'display.amount' | t }}</span>
+          <span class="total-val mono">{{ payableTotal(o) | number: '1.2-2' }} {{ 'payment.thb' | t }}</span>
+        </section>
+      </div>
+
+      @if (!o.cancel && !o.paid && payableTotal(o) > 0) {
+        <aside class="customer-body-qr" [attr.aria-label]="'display.promptPayPayment' | t">
+          <app-promptpay-qr-display [amountBaht]="payableTotal(o)" />
+        </aside>
+      }
+    </div>
+
+    @if (!o.cancel && !o.paid && payableTotal(o) > 0) {
+      <p class="hint-foot">{{ 'display.autoUpdate' | t }}</p>
+    }
+
+    @if (o.cancel || o.paid) {
+      <p class="hint-foot muted">{{ 'display.backgroundRefresh' | t }}</p>
+    }
+
+    <button type="button" class="btn-soft" (click)="refreshNow()">{{ 'display.refreshNow' | t }}</button>
+  } @else {
+    <p class="error-banner" role="alert">{{ loadError() || ('display.notFound' | t) }}</p>
+    <button type="button" class="btn-soft" (click)="refreshNow()">{{ 'display.tryAgain' | t }}</button>
+  }
+</div>

@@ -22,6 +22,21 @@ h1 {
   margin: 0.6rem 0 0.2rem;
 }
 
+.table-order-banner {
+  margin: 0.35rem 0 0.5rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 8px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1e40af;
+}
+
+.table-order-banner .mono {
+  font-weight: 700;
+}
+
 .hint {
   margin: 0 0 0.8rem;
   color: #6b7280;
@@ -209,4 +224,187 @@ h1 {
 .confirm-btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+.guest-error {
+  margin: 0.5rem 0 0;
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+
+@media (max-width: 640px) {
+  .page {
+    margin: 0 auto;
+    max-width: none;
+    padding: 0.65rem clamp(0.65rem, 3vw, 1rem) max(1.15rem, env(safe-area-inset-bottom));
+  }
+
+  .back-btn {
+    font-size: 1rem;
+    min-height: 44px;
+    padding: 0.35rem 0.35rem;
+    margin: 0 0 0 -0.35rem;
+    align-self: flex-start;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  h1 {
+    font-size: clamp(1.3rem, 5vw, 1.72rem);
+    line-height: 1.22;
+    margin-top: 0.35rem;
+  }
+
+  .table-order-banner {
+    font-size: clamp(1.02rem, 3.8vw, 1.15rem);
+    padding: 0.55rem 0.72rem;
+  }
+
+  .hint {
+    font-size: 1rem;
+    line-height: 1.45;
+    margin-bottom: 1rem;
+  }
+
+  .notice {
+    font-size: 1rem;
+    padding: 0.55rem 0.72rem;
+  }
+
+  .pending {
+    font-size: 1.02rem;
+  }
+
+  .pending-list {
+    padding: 0.52rem 0.72rem;
+  }
+
+  .pending-item {
+    font-size: 1rem;
+    padding: 0.45rem 0;
+    gap: 0.75rem;
+  }
+
+  .qty-btn {
+    width: 2.35rem;
+    height: 2.35rem;
+    font-size: 1.2rem;
+    border-radius: 8px;
+  }
+
+  .toolbar {
+    gap: 0.55rem;
+    margin-bottom: 0.85rem;
+    flex-wrap: wrap;
+    align-items: stretch;
+  }
+
+  .toolbar input {
+    flex: 1 1 auto;
+    min-width: min(120px, 100%);
+    min-height: 44px;
+    font-size: 16px;
+    padding: 0.5rem 0.72rem;
+  }
+
+  .qty {
+    width: 5rem;
+    flex: 0 0 auto;
+  }
+
+  .category-toolbar {
+    gap: 0.45rem;
+    margin-bottom: 0.82rem;
+  }
+
+  .cat-btn {
+    font-size: 0.95rem;
+    padding: 0.42rem 0.82rem;
+    min-height: 42px;
+  }
+
+  .page--guest .cat-btn {
+    font-size: 1rem;
+    min-height: 44px;
+    padding: 0.46rem 0.92rem;
+  }
+
+  /* Two columns keeps items legible without squashing labels */
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.72rem;
+  }
+
+  .card {
+    min-height: unset;
+    padding: 0.55rem;
+  }
+
+  .name {
+    font-size: clamp(0.96rem, 3.9vw, 1.06rem);
+    margin-top: 0.52rem;
+  }
+
+  .price {
+    font-size: clamp(0.92rem, 3.6vw, 1.02rem);
+    margin-top: 0.32rem;
+  }
+
+  .no-pic {
+    font-size: 0.95rem;
+  }
+
+  .empty {
+    font-size: 1rem;
+  }
+
+  .confirm-row {
+    margin-top: 1rem;
+    justify-content: stretch;
+  }
+
+  .confirm-btn {
+    width: 100%;
+    min-height: 48px;
+    font-size: 1.06rem;
+    padding: 0.68rem 1rem;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .guest-error {
+    font-size: 1rem;
+    padding: 0.62rem 0.72rem;
+  }
+
+  /* Guest path: comfortably large cards */
+  .page--guest .card {
+    padding: 0.6rem;
+  }
+
+  .page--guest .name {
+    font-size: clamp(1rem, 4.1vw, 1.14rem);
+  }
+
+  .page--guest .price {
+    font-size: clamp(0.96rem, 3.9vw, 1.06rem);
+  }
+}
+
+@media (max-width: 360px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card:hover {
+    box-shadow: none;
+  }
 }

@@ -1,7 +1,19 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
+import {
+  afterNextRender,
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  ElementRef,
+  inject,
+  Injector,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
   catchError,
@@ -10,11 +22,11 @@ import {
   map,
   of,
   switchMap,
+  throwError,
   timer,
 } from 'rxjs';
 
-import { PosCurrentUserService } from '../auth/pos-current-user.service';
-import type { Food } from '../food/food.model';
+import { foodBlocksOrderLines, type Food } from '../food/food.model';
 import { FoodService } from '../food/food.service';
 import type { PosTable } from '../table/table.model';
 import { foodPickerLabel, tablePickerLabel } from './order-merge.util';
@@ -24,41 +36,49 @@ import {
   resolvedLineStatus,
 } from './order-line-status.util';
 import {
-  computePaySettlement,
-  lineUnitPrice,
-  newOrderLineRequest,
-  orderAfterPayPatch,
-  orderComplated,
-  orderComplatedDate,
-  orderIsPaid,
-  orderLineToRequest,
-  orderOrderDate,
-  orderOrderNo,
-  orderPaidFields,
-  orderPayStateForPut,
-  orderSettlementForPut,
-  orderUserFields,
-  type OrderLine,
-  type OrderRequest,
-  type PosOrder,
-} from './order.model';
+  buildPayOrderRequest,
+  mergeOrderRequestPaymentFromPosOrder,
+  mergePayOrderAmounts,
+  readOrderPaidByCredit,
+  readOrderPaidByQrScan,
+  readPosOrderNote,
+  readPosOrderPaidPrice,
+} from './order-pay.util';
+import { CustomerDisplaySessionService, CUSTOMER_DISPLAY_WINDOW_NAME } from './customer-display-session.service';
+import { pingOrderCustomerDisplayRefresh } from './order-customer-display-sync';
+import { lineKitchenNote, orderLineRequestNotePart } from './order-line-note.util';
+import type { OrderLine, OrderLineStatus, OrderRequest, PayOrderRequest, PosOrder } from './order.model';
 import { OrderService } from './order.service';
+import { LocaleService } from '../i18n/locale.service';
+import { TranslatePipe } from '../i18n/translate.pipe';
+import { PromptPayQrDisplayComponent } from '../payment/promptpay-qr-display.component';
 
 @Component({
   selector: 'app-order-list',
   standalone: true,
-  imports: [DatePipe, DecimalPipe, RouterLink],
+  imports: [DatePipe, DecimalPipe, FormsModule, RouterLink, PromptPayQrDisplayComponent, TranslatePipe],
   templateUrl: './order-list.component.html',
   styleUrl: './order-list.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class OrderListComponent {
+  /** Template: show per-line kitchen note when present. */
+  readonly lineKitchenNote = lineKitchenNote;
+  /** Template: whole-order note from API for list column. */
+  readonly readPosOrderNote = readPosOrderNote;
+  readonly readOrderPaidByQrScan = readOrderPaidByQrScan;
+  readonly readOrderPaidByCredit = readOrderPaidByCredit;
+
   private static readonly PICKED_EXISTING_ORDER_LINES_KEY = 'order-list-add-picked-lines-v1';
   private readonly orderService = inject(OrderService);
   private readonly foodService = inject(FoodService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
-  private readonly currentUser = inject(PosCurrentUserService);
+  private readonly customerDisplaySession = inject(CustomerDisplaySessionService);
+  private readonly injector = inject(Injector);
+  private readonly i18n = inject(LocaleService);
+  /** Focus target when Settle payment opens. */
+  private readonly payAmountInputRef = viewChild<ElementRef<HTMLInputElement>>('payAmountInput');
 
   readonly createdId = toSignal(
     this.route.queryParamMap.pipe(map((p) => p.get('created'))),
@@ -72,8 +92,6 @@ export class OrderListComponent {
 
   readonly searchTerm = signal('');
   readonly refreshNonce = signal(0);
-  /** Merged on top of GET `/api/orders` until the list reflects pay (GET is often stale). */
-  private readonly orderRowPatchById = signal(new Map<number, PosOrder>());
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly deletingId = signal<number | null>(null);
@@ -81,6 +99,10 @@ export class OrderListComponent {
   readonly payingId = signal<number | null>(null);
   readonly payError = signal<string | null>(null);
   readonly payDialogOrderId = signal<number | null>(null);
+  /** Fresh `GET /orders/{id}` while Settle payment is open — includes whole-order `note` when list does not. */
+  readonly payDialogOrderDetail = signal<PosOrder | null>(null);
+  readonly payDialogNoteDraft = signal('');
+  readonly payDialogNoteError = signal<string | null>(null);
   readonly payInputAmount = signal<string>('');
   readonly addingLineId = signal<number | null>(null);
   readonly addLineError = signal<string | null>(null);
@@ -92,6 +114,12 @@ export class OrderListComponent {
   readonly addFoodSearchByOrderId = signal<Record<number, string>>({});
   readonly expandedOrderId = signal<number | null>(null);
 
+  readonly pageSize = signal(20);
+  readonly pageIndex = signal(0);
+  readonly pageSizeOptions = [10, 20, 50] as const;
+  /** When true, only orders where Done = No (`complateOrder` false). */
+  readonly showOnlyNotDone = signal(false);
+
   readonly foods = toSignal(
     this.foodService.getFoods().pipe(
       map((foods) =>
@@ -102,35 +130,99 @@ export class OrderListComponent {
     { initialValue: [] as Food[] },
   );
 
+  readonly orders = toSignal(
+    combineLatest([toObservable(this.searchTerm), toObservable(this.refreshNonce)]).pipe(
+      switchMap(([q]) => {
+        this.loading.set(true);
+        this.error.set(null);
+        const trimmed = q.trim();
+        return timer(trimmed ? 300 : 0).pipe(
+          switchMap(() =>
+            this.orderService.searchOrders(trimmed || undefined).pipe(
+              catchError(() => {
+                this.error.set(
+                  this.i18n.translate('common.couldNotLoad', { entity: this.i18n.translate('order.entity') }),
+                );
+                return of([] as PosOrder[]);
+              }),
+              finalize(() => this.loading.set(false)),
+            ),
+          ),
+        );
+      }),
+    ),
+    { initialValue: [] as PosOrder[] },
+  );
+
+  /** Search results optionally filtered by “not done” (order-level Done flag). */
+  readonly visibleOrders = computed(() => {
+    const all = this.orders();
+    if (!this.showOnlyNotDone()) {
+      return all;
+    }
+    return all.filter((o) => !o.complateOrder);
+  });
+
+  readonly totalOrders = computed(() => this.visibleOrders().length);
+
+  readonly pageCount = computed(() => {
+    const n = this.totalOrders();
+    const s = Math.max(1, this.pageSize());
+    return Math.max(1, Math.ceil(n / s));
+  });
+
+  readonly pagedOrders = computed(() => {
+    const all = this.visibleOrders();
+    const s = Math.max(1, this.pageSize());
+    const start = this.pageIndex() * s;
+    return all.slice(start, start + s);
+  });
+
+  readonly pagerRangeLabel = computed(() => {
+    const total = this.totalOrders();
+    if (total === 0) {
+      return 'No orders';
+    }
+    const s = Math.max(1, this.pageSize());
+    const i = this.pageIndex();
+    const from = i * s + 1;
+    const to = Math.min(total, (i + 1) * s);
+    return `${from}–${to} of ${total}`;
+  });
+
   constructor() {
     effect(() => {
-      const rawList = this.orders();
-      if (rawList.length === 0) {
+      const total = this.orders().length;
+      const size = Math.max(1, this.pageSize());
+      const maxIdx = Math.max(0, Math.ceil(total / size) - 1);
+      if (this.pageIndex() > maxIdx) {
+        this.pageIndex.set(maxIdx);
+      }
+    });
+
+    effect(() => {
+      if (this.payDialogOrderId() == null) {
         return;
       }
-      this.orderRowPatchById.update((m) => {
-        if (m.size === 0) {
-          return m;
-        }
-        const next = new Map(m);
-        for (const o of rawList) {
-          if (o.id != null && orderIsPaid(o)) {
-            next.delete(o.id);
-          }
-        }
-        return next.size !== m.size ? next : m;
-      });
+      afterNextRender(
+        () => {
+          const el = this.payAmountInputRef()?.nativeElement;
+          el?.focus();
+          el?.select();
+        },
+        { injector: this.injector },
+      );
     });
 
     combineLatest([this.route.queryParamMap, toObservable(this.orders)]).subscribe(([qpm, orders]) => {
       const openPayId = Number(qpm.get('openPayId') ?? '');
       if (Number.isFinite(openPayId) && openPayId > 0) {
-        const orderForPay = orders.find((o) => o.id === openPayId);
-        if (!orderForPay) {
+        const payOrder = orders.find((o) => o.id === openPayId);
+        if (!payOrder) {
           return;
         }
-        if (!orderIsPaid(orderForPay)) {
-          this.openPayDialog(orderForPay);
+        if (!payOrder.paid) {
+          this.openPayDialog(payOrder);
         }
         void this.router.navigate([], {
           relativeTo: this.route,
@@ -180,75 +272,36 @@ export class OrderListComponent {
     });
   }
 
-  readonly orders = toSignal(
-    combineLatest([toObservable(this.searchTerm), toObservable(this.refreshNonce)]).pipe(
-      switchMap(([q]) => {
-        this.loading.set(true);
-        this.error.set(null);
-        const trimmed = q.trim();
-        return timer(trimmed ? 300 : 0).pipe(
-          switchMap(() =>
-            this.orderService.searchOrders(trimmed || undefined).pipe(
-              catchError(() => {
-                this.error.set('Could not load orders. Check that the API is running.');
-                return of([] as PosOrder[]);
-              }),
-              finalize(() => this.loading.set(false)),
-            ),
-          ),
-        );
-      }),
-    ),
-    { initialValue: [] as PosOrder[] },
-  );
-
-  /** List rows with short-lived pay patches applied (see {@link orderRowPatchById}). */
-  readonly ordersView = computed(() => {
-    const list = this.orders();
-    const patches = this.orderRowPatchById();
-    if (patches.size === 0) {
-      return list;
-    }
-    return list.map((o) => {
-      if (o.id == null) {
-        return o;
-      }
-      const p = patches.get(o.id);
-      return p ?? o;
-    });
-  });
-
-  readonly payDialogOrder = computed(() => {
-    const id = this.payDialogOrderId();
-    if (id == null) {
-      return undefined;
-    }
-    return this.ordersView().find((o) => o.id === id);
-  });
-
-  /** Updates when `payInputAmount` or the open pay order changes (OnPush-safe live “change” preview). */
-  readonly payDialogChangePreview = computed(() => {
-    const id = this.payDialogOrderId();
-    if (id == null) {
-      return 0;
-    }
-    const order = this.ordersView().find((o) => o.id === id);
-    if (order == null) {
-      return 0;
-    }
-    const raw = this.payInputAmount().trim();
-    if (raw === '') {
-      return 0;
-    }
-    const tendered = Number(raw);
-    if (!Number.isFinite(tendered)) {
-      return 0;
-    }
-    return computePaySettlement(this.payableTotal(order), tendered).change;
-  });
-
   onSearchInput(value: string): void {
     this.searchTerm.set(value);
+    this.pageIndex.set(0);
+    this.expandedOrderId.set(null);
+  }
+
+  setPageSize(size: number): void {
+    if (![10, 20, 50].includes(size)) {
+      return;
+    }
+    this.pageSize.set(size);
+    this.pageIndex.set(0);
+    this.expandedOrderId.set(null);
+  }
+
+  goPrevPage(): void {
+    this.pageIndex.update((p) => Math.max(0, p - 1));
+    this.expandedOrderId.set(null);
+  }
+
+  goNextPage(): void {
+    const last = this.pageCount() - 1;
+    this.pageIndex.update((p) => Math.min(last, p + 1));
+    this.expandedOrderId.set(null);
+  }
+
+  onShowOnlyNotDone(checked: boolean): void {
+    this.showOnlyNotDone.set(checked);
+    this.pageIndex.set(0);
+    this.expandedOrderId.set(null);
   }
 
   deleteOrder(o: PosOrder): void {
@@ -256,7 +309,7 @@ export class OrderListComponent {
       return;
     }
     this.deleteError.set(null);
-    if (!window.confirm(`Delete order "${orderOrderNo(o)}"?`)) {
+    if (!window.confirm(this.i18n.translate('order.deleteConfirm', { orderNo: o.orderNo }))) {
       return;
     }
     this.deletingId.set(o.id);
@@ -266,23 +319,72 @@ export class OrderListComponent {
       .subscribe({
         next: () => this.refreshNonce.update((n) => n + 1),
         error: (err: unknown) => {
-          this.deleteError.set(this.extractErrorMessage(err));
+          this.deleteError.set(
+            this.extractErrorMessage(
+              err,
+              this.i18n.translate('common.couldNotDelete', { entity: this.i18n.translate('order.entity') }),
+            ),
+          );
         },
       });
   }
 
   openPayDialog(o: PosOrder): void {
-    if (o.id == null || orderIsPaid(o)) {
+    if (o.id == null || o.paid) {
       return;
     }
     this.payError.set(null);
     this.payInputAmount.set(this.payableTotal(o).toFixed(2));
+    this.payDialogOrderDetail.set(null);
+    this.payDialogNoteDraft.set(readPosOrderNote(o) ?? '');
+    this.payDialogNoteError.set(null);
     this.payDialogOrderId.set(o.id);
+    this.refreshPayDialogOrderFromApi(o.id);
+    this.customerDisplaySession.focusOrder(o.id);
+  }
+
+  private refreshPayDialogOrderFromApi(orderId: number): void {
+    this.orderService.getOrderById(orderId).subscribe({
+      next: (full) => {
+        if (this.payDialogOrderId() === orderId && full) {
+          this.payDialogOrderDetail.set(full);
+          this.payDialogNoteDraft.set(readPosOrderNote(full) ?? '');
+        }
+      },
+      error: () => {
+        /* list row still drives the dialog */
+      },
+    });
+  }
+
+  /** Opens kiosk / tablet customer-facing total + PromptPay QR in a new browser tab. */
+  openCustomerDisplayPage(orderId: number | null | undefined): void {
+    if (orderId == null) {
+      return;
+    }
+    this.customerDisplaySession.focusOrder(orderId);
+    const url = this.router.serializeUrl(this.router.createUrlTree(['/orders', 'display']));
+    window.open(url, CUSTOMER_DISPLAY_WINDOW_NAME);
   }
 
   closePayDialog(): void {
     this.payDialogOrderId.set(null);
+    this.payDialogOrderDetail.set(null);
+    this.payDialogNoteDraft.set('');
+    this.payDialogNoteError.set(null);
     this.payInputAmount.set('');
+  }
+
+  payDialogOrder(): PosOrder | undefined {
+    const id = this.payDialogOrderId();
+    if (id == null) {
+      return undefined;
+    }
+    const detail = this.payDialogOrderDetail();
+    if (detail != null && detail.id === id) {
+      return detail;
+    }
+    return this.orders().find((o) => o.id === id);
   }
 
   confirmPayFromDialog(): void {
@@ -292,49 +394,123 @@ export class OrderListComponent {
       return;
     }
     const amount = Number(this.payInputAmount());
-    if (!Number.isFinite(amount) || amount < 0) {
-      this.payError.set('Please enter a valid cash amount from the customer.');
+    const rawPay = buildPayOrderRequest(amount, this.payableTotal(order));
+    if ('error' in rawPay) {
+      this.payError.set(this.i18n.translate(rawPay.error));
       return;
     }
-    if (order.table?.id == null) {
+    this.submitPaymentFromDialog(order, rawPay);
+  }
+
+  /** Records exact due as tender/change zero; cashier must enter exact total (no change) to enable the button. */
+  confirmPayQrFromDialog(): void {
+    const order = this.payDialogOrder();
+    if (!order || order.id == null) {
+      this.closePayDialog();
+      return;
+    }
+    if (this.payQrSettlementDisabled(order)) {
+      this.payError.set(this.i18n.translate('order.qrExactTotal'));
+      return;
+    }
+    const due = this.payableTotal(order);
+    const rawPay = buildPayOrderRequest(due, due);
+    if ('error' in rawPay) {
+      this.payError.set(this.i18n.translate(rawPay.error));
+      return;
+    }
+    this.submitPaymentFromDialog(order, { ...rawPay, paidByQrScan: true });
+  }
+
+  /** Card/credit: exact total, no change (same gate as QR). */
+  confirmPayCreditFromDialog(): void {
+    const order = this.payDialogOrder();
+    if (!order || order.id == null) {
+      this.closePayDialog();
+      return;
+    }
+    if (this.payQrSettlementDisabled(order)) {
+      this.payError.set(this.i18n.translate('order.creditExactTotal'));
+      return;
+    }
+    const due = this.payableTotal(order);
+    const rawPay = buildPayOrderRequest(due, due);
+    if ('error' in rawPay) {
+      this.payError.set(this.i18n.translate(rawPay.error));
+      return;
+    }
+    this.submitPaymentFromDialog(order, { ...rawPay, paidByCredit: true });
+  }
+
+  /** Used to disable Paid by QR: exact amount only (no cash change scenario). */
+  payQrSettlementDisabled(order: PosOrder): boolean {
+    const id = order.id ?? 0;
+    if (this.payingId() === id || id <= 0) {
+      return true;
+    }
+    const raw = this.payInputAmount().trim();
+    if (raw === '') {
+      return true;
+    }
+    const amt = Number(raw);
+    if (!Number.isFinite(amt) || amt < 0) {
+      return true;
+    }
+    const due = this.payableTotal(order);
+    if (!Number.isFinite(due)) {
+      return true;
+    }
+    const tenderCents = Math.round(amt * 100);
+    const dueCents = Math.round(due * 100);
+    if (tenderCents < dueCents || tenderCents > dueCents) {
+      return true;
+    }
+    return false;
+  }
+
+  private submitPaymentFromDialog(order: PosOrder, payBody: PayOrderRequest): void {
+    if (order.id == null || order.table?.id == null) {
       this.payError.set('Order has no table reference and cannot be paid.');
       return;
     }
     const id = order.id;
-    /** Always send every non-canceled line as COMPLETE on pay — many APIs keep `paid` false if any line is still WAIT. */
-    const lineUpdateBody = orderRequestCompleteAllExceptCanceled(order);
-    if (lineUpdateBody == null) {
-      this.payError.set('Could not build line update for payment.');
-      return;
-    }
-    const settlement = computePaySettlement(this.payableTotal(order), amount);
-    const paidAt = new Date().toISOString().slice(0, 19);
-    const updatePayload: OrderRequest = {
-      ...lineUpdateBody,
-      ...orderSettlementForPut(settlement),
-      ...orderPayStateForPut(paidAt),
-      complateOrder: true,
-      complateOrderDate: paidAt,
-    };
+    /** Whole-order note from the dialog — saved on the same PUT as payment (no separate PATCH). */
+    const draft = this.payDialogNoteDraft().trim().slice(0, 2000);
+
     this.payingId.set(id);
     this.payError.set(null);
-    const pay$ = this.orderService.updateOrder(id, updatePayload);
-    pay$
-      .pipe(finalize(() => this.payingId.set(null)))
-      .subscribe({
-        next: (updated) => {
-          const patch = orderAfterPayPatch(order, updated, paidAt, settlement);
-          if (order.id != null) {
-            this.orderRowPatchById.update((m) => new Map(m).set(order.id!, patch));
+    this.payDialogNoteError.set(null);
+
+    this.orderService
+      .getOrderRowById(id)
+      .pipe(
+        switchMap((fresh) => {
+          const baseBody = orderRequestCompleteAllExceptCanceled(fresh);
+          if (baseBody == null) {
+            return throwError(
+              () => new Error(this.i18n.translate('order.noTableUpdate')),
+            );
           }
+          const prepBody = mergePayOrderAmounts({ ...baseBody, note: draft }, payBody);
+          return this.orderService.updateOrder(id, prepBody).pipe(
+            switchMap(() => this.orderService.payOrder(id, payBody)),
+          );
+        }),
+        finalize(() => this.payingId.set(null)),
+      )
+      .subscribe({
+        next: () => {
+          this.customerDisplaySession.focusOrder(id);
           this.closePayDialog();
           this.refreshNonce.update((n) => n + 1);
         },
         error: (err: unknown) => {
-          this.payError.set(
-            this.httpErrorDetail(err) ||
-              'Could not record payment (order update failed, already paid, or the API is unreachable).',
+          const message = this.extractErrorMessage(
+            err,
+            this.i18n.translate('order.couldNotRecordPayment'),
           );
+          this.payError.set(message);
+          this.payDialogNoteError.set(message);
         },
       });
   }
@@ -362,10 +538,22 @@ export class OrderListComponent {
   filteredFoodsForAddLine(orderId: number): Food[] {
     const q = this.addLineFoodSearch(orderId).trim().toLowerCase();
     const all = this.foods();
-    if (!q) {
-      return all;
+    const selRaw = this.addLineFood(orderId);
+    const selId = Number(selRaw);
+
+    let base = all.filter((f) => !foodBlocksOrderLines(f));
+    if (q) {
+      base = base.filter((f) => this.foodLabel(f).toLowerCase().includes(q));
     }
-    return all.filter((f) => this.foodLabel(f).toLowerCase().includes(q));
+
+    if (!Number.isFinite(selId) || selId < 1) {
+      return base;
+    }
+    const picked = all.find((f) => f.id === selId);
+    if (!picked || base.some((f) => f.id === selId)) {
+      return base;
+    }
+    return [picked, ...base];
   }
 
   selectedFoodForAddLine(orderId: number): Food | undefined {
@@ -385,7 +573,7 @@ export class OrderListComponent {
   }
 
   addLineFromList(o: PosOrder): void {
-    if (o.id == null || orderIsPaid(o)) {
+    if (o.id == null || o.paid) {
       return;
     }
     const orderId = o.id;
@@ -397,7 +585,12 @@ export class OrderListComponent {
       return;
     }
     if (!Number.isFinite(qty) || qty < 1) {
-      this.addLineError.set('Quantity must be at least 1.');
+      this.addLineError.set(this.i18n.translate('order.qtyMinOne'));
+      return;
+    }
+    const foodRow = this.foods().find((f) => f.id === pickedFoodId);
+    if (foodRow && foodBlocksOrderLines(foodRow)) {
+      this.addLineError.set(this.i18n.translate('order.foodBlocked'));
       return;
     }
     this.addLineToOrder(o, pickedFoodId, qty);
@@ -416,18 +609,35 @@ export class OrderListComponent {
     });
   }
 
-  lineStatus(line: OrderLine, order: PosOrder): 'WAIT' | 'COMPLETE' | 'CANCEL' {
+  lineStatus(line: OrderLine, order: PosOrder): OrderLineStatus {
     return resolvedLineStatus(line, order);
   }
 
-  lineStatusIcon(status: 'WAIT' | 'COMPLETE' | 'CANCEL'): string {
+  lineStatusIcon(status: OrderLineStatus): string {
     if (status === 'COMPLETE') {
       return '✓';
     }
     if (status === 'CANCEL') {
       return '✕';
     }
+    if (status === 'FINISH_COOKING') {
+      return '📦';
+    }
     return '⏳';
+  }
+
+  /** Label for tooltips / accessibility (API uses `FINISH_COOKING`, etc.). */
+  lineStatusLabel(status: OrderLineStatus): string {
+    if (status === 'FINISH_COOKING') {
+      return this.i18n.translate('order.statusFinishCooking');
+    }
+    if (status === 'COMPLETE') {
+      return this.i18n.translate('order.statusComplete');
+    }
+    if (status === 'CANCEL') {
+      return this.i18n.translate('order.statusCancel');
+    }
+    return this.i18n.translate('order.statusWait');
   }
 
   private lineUpdateKey(orderId: number, lineIndex: number): string {
@@ -447,7 +657,7 @@ export class OrderListComponent {
   }
 
   completeAllLineStatuses(o: PosOrder): void {
-    if (o.id == null || orderIsPaid(o)) {
+    if (o.id == null || o.paid) {
       return;
     }
     if (!this.hasWaitingLines(o)) {
@@ -456,7 +666,7 @@ export class OrderListComponent {
     this.statusError.set(null);
     const body = orderRequestCompleteAllExceptCanceled(o);
     if (body == null) {
-      this.statusError.set('Order has no table reference and cannot be updated.');
+      this.statusError.set(this.i18n.translate('order.noTableUpdate'));
       return;
     }
     this.completeAllOrderId.set(o.id);
@@ -464,9 +674,17 @@ export class OrderListComponent {
       .updateOrder(o.id, body)
       .pipe(finalize(() => this.completeAllOrderId.set(null)))
       .subscribe({
-        next: () => this.refreshNonce.update((n) => n + 1),
+        next: () => {
+          const id = o.id;
+          if (id != null) {
+            pingOrderCustomerDisplayRefresh(id);
+          }
+          this.refreshNonce.update((n) => n + 1);
+        },
         error: (err: unknown) => {
-          this.statusError.set(this.extractErrorMessage(err));
+          this.statusError.set(
+            this.extractErrorMessage(err, this.i18n.translate('order.couldNotUpdateStatus')),
+          );
         },
       });
   }
@@ -476,7 +694,7 @@ export class OrderListComponent {
     lineIndex: number,
     target: 'COMPLETE' | 'CANCEL',
   ): void {
-    if (o.id == null || orderIsPaid(o)) {
+    if (o.id == null || o.paid) {
       return;
     }
     const tableId = o.table?.id;
@@ -486,38 +704,49 @@ export class OrderListComponent {
     }
     this.statusError.set(null);
     const now = new Date().toISOString().slice(0, 19);
-    const body: OrderRequest = {
-      orderNo: orderOrderNo(o),
-      tableId,
-      orderDate: orderOrderDate(o) ?? now,
-      complateOrder: target === 'COMPLETE',
-      complateOrderDate: target === 'COMPLETE' ? now : null,
-      cancel: target === 'CANCEL',
-      ...orderPaidFields(o),
-      ...orderUserFields(o),
-      version: o.version,
-      lines: (o.lines ?? [])
-        .map((ln, idx) =>
-          orderLineToRequest(ln, idx === lineIndex ? target : this.lineStatus(ln, o)),
-        )
-        .filter((ln) => ln.foodId > 0),
-    };
+    const body = mergeOrderRequestPaymentFromPosOrder(
+      {
+        orderNo: o.orderNo,
+        tableId,
+        orderDate: o.orderDate ?? now,
+        complateOrder: target === 'COMPLETE',
+        complateOrderDate: target === 'COMPLETE' ? now : null,
+        cancel: target === 'CANCEL',
+        version: o.version,
+        lines: (o.lines ?? []).map((ln, idx) => ({
+          foodId: ln.food?.id ?? 0,
+          quantity: ln.quantity,
+          status: idx === lineIndex ? target : this.lineStatus(ln, o),
+          ...orderLineRequestNotePart(ln),
+        }))
+          .filter((ln) => ln.foodId > 0),
+      },
+      o,
+    );
     const lineKey = this.lineUpdateKey(o.id, lineIndex);
     this.statusUpdatingKey.set(lineKey);
     this.orderService
       .updateOrder(o.id, body)
       .pipe(finalize(() => this.statusUpdatingKey.set(null)))
       .subscribe({
-        next: () => this.refreshNonce.update((n) => n + 1),
+        next: () => {
+          const oid = o.id;
+          if (oid != null) {
+            pingOrderCustomerDisplayRefresh(oid);
+          }
+          this.refreshNonce.update((n) => n + 1);
+        },
         error: (err: unknown) => {
-          this.statusError.set(this.extractErrorMessage(err));
+          this.statusError.set(
+            this.extractErrorMessage(err, this.i18n.translate('order.couldNotUpdateStatus')),
+          );
         },
       });
   }
 
   tableCell(t: PosTable | null | undefined): string {
     if (!t) {
-      return '—';
+      return this.i18n.translate('common.emptyDash');
     }
     return tablePickerLabel(t);
   }
@@ -532,7 +761,7 @@ export class OrderListComponent {
   linesSummary(o: PosOrder): string {
     const lines = o.lines ?? [];
     if (lines.length === 0) {
-      return '—';
+      return this.i18n.translate('common.emptyDash');
     }
     return lines
       .map((ln) => {
@@ -543,7 +772,7 @@ export class OrderListComponent {
   }
 
   orderTotal(o: PosOrder): number {
-    return (o.lines ?? []).reduce((sum, ln) => sum + ln.quantity * lineUnitPrice(ln), 0);
+    return (o.lines ?? []).reduce((sum, ln) => sum + ln.quantity * ln.unitPrice, 0);
   }
 
   payableTotal(o: PosOrder): number {
@@ -551,8 +780,27 @@ export class OrderListComponent {
       if (this.lineStatus(ln, o) === 'CANCEL') {
         return sum;
       }
-      return sum + ln.quantity * lineUnitPrice(ln);
+      return sum + ln.quantity * ln.unitPrice;
     }, 0);
+  }
+
+  /** Stored cash tendered (`paidPrice`); shown for reporting when the API returns it. */
+  amountReceived(o: PosOrder): number | null {
+    return readPosOrderPaidPrice(o);
+  }
+
+  /** Cash change when the entered amount is greater than the payable total (cent-safe). */
+  payDialogChange(order: PosOrder): number {
+    const tendered = Number(this.payInputAmount());
+    const due = this.payableTotal(order);
+    if (!Number.isFinite(tendered) || !Number.isFinite(due)) {
+      return 0;
+    }
+    const cents = Math.round(tendered * 100) - Math.round(due * 100);
+    if (cents <= 0) {
+      return 0;
+    }
+    return cents / 100;
   }
 
   toggleOrderLines(orderId: number | null | undefined): void {
@@ -562,42 +810,25 @@ export class OrderListComponent {
     this.expandedOrderId.update((curr) => (curr === orderId ? null : orderId));
   }
 
-  orderLineStatus(o: PosOrder): 'WAIT' | 'COMPLETE' | 'CANCEL' {
+  orderLineStatus(o: PosOrder): OrderLineStatus {
     if (o.cancel) {
       return 'CANCEL';
     }
-    if (orderComplated(o) || orderIsPaid(o)) {
+    if (o.complateOrder || o.paid) {
       return 'COMPLETE';
     }
     return 'WAIT';
   }
 
-  isOrderPaid(o: PosOrder): boolean {
-    return orderIsPaid(o);
-  }
-
-  displayOrderNo(o: PosOrder): string {
-    return orderOrderNo(o) || '—';
-  }
-
-  listOrderDateIso(o: PosOrder): string | null {
-    const d = orderOrderDate(o);
-    return d != null && String(d).trim() !== '' ? d : null;
-  }
-
-  isOrderComplated(o: PosOrder): boolean {
-    return orderComplated(o);
-  }
-
-  lineUnitPriceFor(ln: OrderLine): number {
-    return lineUnitPrice(ln);
-  }
-
-  private extractErrorMessage(err: unknown): string {
-    return (
-      this.httpErrorDetail(err) ||
-      'Could not delete order. Check API connectivity and dependencies.'
-    );
+  private extractErrorMessage(err: unknown, fallback: string): string {
+    const d = this.httpErrorDetail(err);
+    if (d) {
+      return d;
+    }
+    if (err instanceof Error && err.message.trim().length > 0) {
+      return err.message;
+    }
+    return fallback;
   }
 
   private httpErrorDetail(err: unknown): string {
@@ -612,6 +843,9 @@ export class OrderListComponent {
       if (typeof err.error === 'string' && err.error.trim().length > 0) {
         return err.error;
       }
+      if (err.status >= 400) {
+        return this.i18n.translate('common.requestFailedHttp', { status: err.status });
+      }
     }
     return '';
   }
@@ -620,42 +854,46 @@ export class OrderListComponent {
     const orderId = o.id;
     const tableId = o.table?.id;
     if (orderId == null || tableId == null) {
-      this.addLineError.set('Order has no table reference and cannot be updated.');
+      this.addLineError.set(this.i18n.translate('order.noTableUpdate'));
       return;
     }
-    const actorUserId = this.currentUser.requireUserId();
-    if (actorUserId == null) {
-      this.addLineError.set('Set your User ID in the header before adding order lines.');
-      return;
-    }
-    const body: OrderRequest = {
-      orderNo: orderOrderNo(o),
-      tableId,
-      orderDate: orderOrderDate(o) ?? new Date().toISOString().slice(0, 19),
-      complateOrder: orderComplated(o),
-      complateOrderDate: orderComplatedDate(o),
-      cancel: o.cancel,
-      ...orderPaidFields(o),
-      ...orderUserFields(o),
-      version: o.version,
-      lines: [
-        ...(o.lines ?? []).map((ln) => orderLineToRequest(ln, this.lineStatus(ln, o))),
-        newOrderLineRequest(foodId, qty, 'WAIT', actorUserId),
-      ].filter((ln) => ln.foodId > 0),
-    };
+    const body = mergeOrderRequestPaymentFromPosOrder(
+      {
+        orderNo: o.orderNo,
+        tableId,
+        orderDate: o.orderDate ?? new Date().toISOString().slice(0, 19),
+        complateOrder: o.complateOrder,
+        complateOrderDate: o.complateOrderDate,
+        cancel: o.cancel,
+        version: o.version,
+        lines: [
+          ...(o.lines ?? []).map((ln) => ({
+            foodId: ln.food?.id ?? 0,
+            quantity: ln.quantity,
+            status: this.lineStatus(ln, o),
+            ...orderLineRequestNotePart(ln),
+          })),
+          { foodId, quantity: qty, status: 'WAIT' as const },
+        ].filter((ln) => ln.foodId > 0),
+      },
+      o,
+    );
     this.addingLineId.set(orderId);
     this.orderService
       .updateOrder(orderId, body)
       .pipe(finalize(() => this.addingLineId.set(null)))
       .subscribe({
         next: () => {
+          pingOrderCustomerDisplayRefresh(orderId);
           this.refreshNonce.update((n) => n + 1);
           this.addFoodByOrderId.update((prev) => ({ ...prev, [orderId]: '' }));
           this.addQtyByOrderId.update((prev) => ({ ...prev, [orderId]: '1' }));
           this.addFoodSearchByOrderId.update((prev) => ({ ...prev, [orderId]: '' }));
         },
         error: (err: unknown) => {
-          this.addLineError.set(this.extractErrorMessage(err));
+          this.addLineError.set(
+            this.extractErrorMessage(err, 'Could not add line. Check API connectivity.'),
+          );
         },
       });
   }
@@ -666,13 +904,8 @@ export class OrderListComponent {
   ): void {
     const orderId = o.id;
     const tableId = o.table?.id;
-    if (orderId == null || tableId == null || orderIsPaid(o)) {
-      this.addLineError.set('Order cannot be updated.');
-      return;
-    }
-    const actorUserId = this.currentUser.requireUserId();
-    if (actorUserId == null) {
-      this.addLineError.set('Set your User ID in the header before adding order lines.');
+    if (orderId == null || tableId == null || o.paid) {
+      this.addLineError.set(this.i18n.translate('order.cannotUpdate'));
       return;
     }
     const merged = new Map<number, number>();
@@ -680,23 +913,31 @@ export class OrderListComponent {
       const curr = merged.get(item.foodId) ?? 0;
       merged.set(item.foodId, curr + Math.max(1, Math.floor(item.qty)));
     }
-    const body: OrderRequest = {
-      orderNo: orderOrderNo(o),
-      tableId,
-      orderDate: orderOrderDate(o) ?? new Date().toISOString().slice(0, 19),
-      complateOrder: orderComplated(o),
-      complateOrderDate: orderComplatedDate(o),
-      cancel: o.cancel,
-      ...orderPaidFields(o),
-      ...orderUserFields(o),
-      version: o.version,
-      lines: [
-        ...(o.lines ?? []).map((ln) => orderLineToRequest(ln, this.lineStatus(ln, o))),
-        ...[...merged.entries()].map(([foodId, quantity]) =>
-          newOrderLineRequest(foodId, quantity, 'WAIT', actorUserId),
-        ),
-      ].filter((ln) => ln.foodId > 0),
-    };
+    const body = mergeOrderRequestPaymentFromPosOrder(
+      {
+        orderNo: o.orderNo,
+        tableId,
+        orderDate: o.orderDate ?? new Date().toISOString().slice(0, 19),
+        complateOrder: o.complateOrder,
+        complateOrderDate: o.complateOrderDate,
+        cancel: o.cancel,
+        version: o.version,
+        lines: [
+          ...(o.lines ?? []).map((ln) => ({
+            foodId: ln.food?.id ?? 0,
+            quantity: ln.quantity,
+            status: this.lineStatus(ln, o),
+            ...orderLineRequestNotePart(ln),
+          })),
+          ...[...merged.entries()].map(([foodId, quantity]) => ({
+            foodId,
+            quantity,
+            status: 'WAIT' as const,
+          })),
+        ].filter((ln) => ln.foodId > 0),
+      },
+      o,
+    );
     this.addingLineId.set(orderId);
     this.orderService
       .updateOrder(orderId, body)
@@ -704,10 +945,13 @@ export class OrderListComponent {
       .subscribe({
         next: () => {
           sessionStorage.removeItem(OrderListComponent.PICKED_EXISTING_ORDER_LINES_KEY);
+          pingOrderCustomerDisplayRefresh(orderId);
           this.refreshNonce.update((n) => n + 1);
         },
         error: (err: unknown) => {
-          this.addLineError.set(this.extractErrorMessage(err));
+          this.addLineError.set(
+            this.extractErrorMessage(err, this.i18n.translate('order.couldNotAddLine')),
+          );
         },
       });
   }

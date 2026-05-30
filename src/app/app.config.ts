@@ -1,16 +1,22 @@
 import { ApplicationConfig, provideBrowserGlobalErrorListeners } from '@angular/core';
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 
-import { POS_API_BASE_URL } from './api/pos-api-base-url.token';
+import { devApiResponseLoggerInterceptor } from './api/dev-api-response-logger.interceptor';
+import { jwtAuthInterceptor } from './auth/jwt-auth.interceptor';
+import { POS_API_BASE_URL, POS_USERS_API_ROOT } from './api/pos-api-base-url.token';
+import { POS_API_BASE_URL_VALUE } from './api/pos-api-base-url.value';
 import { routes } from './app.routes';
+import { PROMPTPAY_RECEIVER_ID } from './payment/promptpay-receiver.token';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
-    provideHttpClient(),
+    provideHttpClient(withInterceptors([jwtAuthInterceptor, devApiResponseLoggerInterceptor])),
     provideRouter(routes),
-    { provide: POS_API_BASE_URL, useValue: 'http://localhost:8080' },
+    { provide: POS_API_BASE_URL, useValue: POS_API_BASE_URL_VALUE },
+    /** Empty string hides the QR on the settle dialog. PromptPay QR is usable from any Thai bank app. */
+    { provide: PROMPTPAY_RECEIVER_ID, useValue: '0650946307' },
     // Optional: `{ provide: ZONE_API_BASE_URL, useValue: 'http://other-host:8080' }` to use a different API for zones only.
   ]
 };

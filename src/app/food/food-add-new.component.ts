@@ -6,6 +6,8 @@ import { Router, RouterLink } from '@angular/router';
 import { catchError, finalize, forkJoin, map, Observable, of, switchMap, throwError } from 'rxjs';
 
 import { FoodCategoryService } from '../food-category/food-category.service';
+import { LocaleService } from '../i18n/locale.service';
+import { TranslatePipe } from '../i18n/translate.pipe';
 import type { FoodCategory, Kitchen } from './food.model';
 import { FoodService } from './food.service';
 import { KitchenService } from '../kitchen/kitchen.service';
@@ -13,7 +15,7 @@ import { KitchenService } from '../kitchen/kitchen.service';
 @Component({
   selector: 'app-food-add-new',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, TranslatePipe],
   templateUrl: './food-add-new.component.html',
   styleUrl: './food-add-new.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -24,6 +26,7 @@ export class FoodAddNewComponent {
   private readonly kitchenService = inject(KitchenService);
   private readonly foodCategoryService = inject(FoodCategoryService);
   private readonly router = inject(Router);
+  private readonly i18n = inject(LocaleService);
 
   /**
    * Kitchens: `GET /api/kitchens` merged with kitchens on foods. Categories: `GET /api/food-categories`
@@ -95,6 +98,8 @@ export class FoodAddNewComponent {
     code: ['', [Validators.required, Validators.pattern(/\S/)]],
     name: ['', [Validators.required, Validators.pattern(/\S/)]],
     basePrice: [0, [Validators.required, Validators.min(0)]],
+    /** When true, this SKU cannot be added to orders (kitchen-only listing). */
+    blockOrderLine: [false],
     /** Set when the kitchen `<select>` is shown; value is kitchen id as string. */
     kitchenId: [''],
     /** When no kitchen list is loaded: type name, code, or id — resolved via `GET /api/kitchens?q=` on save. */
@@ -206,7 +211,11 @@ export class FoodAddNewComponent {
     const v = this.form.getRawValue();
     const foodCategoryId = Number(v.foodCategoryId);
     if (!Number.isFinite(foodCategoryId) || foodCategoryId < 1) {
-      this.errorMessage.set('Choose a category or enter a valid category id.');
+      this.errorMessage.set(
+        this.i18n.translate('common.choose', {
+          entity: this.i18n.translate('common.category'),
+        }),
+      );
       return;
     }
     this.submitting.set(true);
@@ -221,6 +230,7 @@ export class FoodAddNewComponent {
               kitchenId,
               foodCategoryId,
               version: Number(v.version),
+              blockOrderLine: !!v.blockOrderLine,
             })
             .pipe(
               switchMap((created) => {
@@ -261,25 +271,27 @@ export class FoodAddNewComponent {
     if (lists.kitchens.length > 0) {
       const id = Number(v.kitchenId);
       if (!Number.isFinite(id) || id < 1) {
-        return throwError(() => new Error('Choose a kitchen from the list.'));
+        return throwError(
+          () =>
+            new Error(
+              this.i18n.translate('common.choose', {
+                entity: this.i18n.translate('common.kitchen'),
+              }),
+            ),
+        );
       }
       return of(id);
     }
     const q = (v.manualKitchenQuery ?? '').trim();
     if (!q) {
-      return throwError(() => new Error('Enter kitchen name, code, or id.'));
+      return throwError(() => new Error(this.i18n.translate('food.kitchenPlaceholder')));
     }
     return this.kitchenService.searchKitchens(q).pipe(
       map((ks) => this.pickSingleKitchenId(ks, q)),
       switchMap((id) =>
         id != null
           ? of(id)
-          : throwError(
-              () =>
-                new Error(
-                  'No unique kitchen match. Use the exact code, full name, or numeric id, or narrow your search.',
-                ),
-            ),
+          : throwError(() => new Error(this.i18n.translate('food.resolveKitchen'))),
       ),
     );
   }
@@ -331,8 +343,13 @@ export class FoodAddNewComponent {
       if (typeof err.error === 'string' && err.error.length > 0) {
         return err.error;
       }
-      return err.message || `Request failed (${err.status})`;
+      return (
+        err.message ||
+        this.i18n.translate('common.requestFailedHttp', { status: err.status })
+      );
     }
-    return 'Could not create food.';
+    return this.i18n.translate('common.couldNotCreate', {
+      entity: this.i18n.translate('food.entity'),
+    });
   }
 }

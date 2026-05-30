@@ -5,12 +5,14 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { catchError, combineLatest, finalize, map, of, switchMap, timer } from 'rxjs';
 
 import type { FoodCategory } from '../food/food.model';
+import { LocaleService } from '../i18n/locale.service';
+import { TranslatePipe } from '../i18n/translate.pipe';
 import { FoodCategoryService } from './food-category.service';
 
 @Component({
   selector: 'app-food-category-list',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, TranslatePipe],
   templateUrl: './food-category-list.component.html',
   styleUrl: './food-category-list.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -18,6 +20,7 @@ import { FoodCategoryService } from './food-category.service';
 export class FoodCategoryListComponent {
   private readonly foodCategoryService = inject(FoodCategoryService);
   private readonly route = inject(ActivatedRoute);
+  private readonly i18n = inject(LocaleService);
 
   readonly createdId = toSignal(
     this.route.queryParamMap.pipe(map((p) => p.get('created'))),
@@ -46,7 +49,11 @@ export class FoodCategoryListComponent {
           switchMap(() =>
             this.foodCategoryService.searchFoodCategories(trimmed || undefined).pipe(
               catchError(() => {
-                this.error.set('Could not load categories. Check that the API is running.');
+                this.error.set(
+                  this.i18n.translate('common.couldNotLoad', {
+                    entity: this.i18n.translate('nav.categories'),
+                  }),
+                );
                 return of([] as FoodCategory[]);
               }),
               finalize(() => this.loading.set(false)),
@@ -67,7 +74,11 @@ export class FoodCategoryListComponent {
       return;
     }
     this.deleteError.set(null);
-    if (!window.confirm(`Delete food category "${c.code}"?`)) {
+    if (
+      !window.confirm(
+        `${this.i18n.translate('common.delete')} "${c.code}"?`,
+      )
+    ) {
       return;
     }
     this.deletingId.set(c.id);
@@ -95,6 +106,8 @@ export class FoodCategoryListComponent {
         return err.error;
       }
     }
-    return 'Could not delete category. Check API connectivity and dependencies.';
+    return this.i18n.translate('common.couldNotDelete', {
+      entity: this.i18n.translate('foodCategory.entity'),
+    });
   }
 }

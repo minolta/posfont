@@ -50,7 +50,8 @@ label {
 }
 
 input,
-select {
+select,
+textarea {
   font: inherit;
   padding: 0.5rem 0.65rem;
   border: 1px solid #c8c8c8;
@@ -59,7 +60,8 @@ select {
 }
 
 input:focus,
-select:focus {
+select:focus,
+textarea:focus {
   outline: 2px solid #2563eb;
   outline-offset: 1px;
   border-color: #2563eb;
@@ -204,7 +206,7 @@ code {
   display: grid;
   grid-template-columns: 1fr 5rem auto;
   gap: 0.65rem 0.75rem;
-  align-items: end;
+  align-items: start;
   margin-bottom: 0.75rem;
   padding-bottom: 0.75rem;
   border-bottom: 1px dashed #e5e5e5;
@@ -216,8 +218,20 @@ code {
   padding-bottom: 0;
 }
 
+.line-note-field {
+  grid-column: 1 / -1;
+}
+
+.line-note-field textarea {
+  resize: vertical;
+  min-height: 2.75rem;
+  line-height: 1.35;
+  width: 100%;
+}
+
 .line-food label,
-.line-qty label {
+.line-qty label,
+.line-note-field label {
   font-size: 0.7rem;
 }
 

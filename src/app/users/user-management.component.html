@@ -1,0 +1,91 @@
+<div class="user-admin">
+  <header class="page-header">
+    <div>
+      <h1>{{ 'users.title' | t }}</h1>
+      <p class="sub">{{ 'users.sub' | t }}</p>
+    </div>
+    <div class="header-actions">
+      <button type="button" class="ghost" (click)="reloadUsers()" [disabled]="loading()">
+        {{ loading() ? ('users.loadingUsers' | t) : ('common.refresh' | t) }}
+      </button>
+      <button type="button" class="ghost danger" (click)="logout()">{{ 'nav.signOut' | t }}</button>
+      <a routerLink="/tables" class="link-back">{{ 'users.pos' | t }}</a>
+    </div>
+  </header>
+
+  @if (listError(); as le) {
+    <div class="banner error" role="alert">{{ le }}</div>
+  }
+
+  <section class="panel">
+    <h2>{{ 'users.addUser' | t }}</h2>
+    @if (formError(); as fe) {
+      <div class="inline-error" role="alert">{{ fe }}</div>
+    }
+    <form [formGroup]="createForm" (ngSubmit)="createUser()" class="create-form" novalidate>
+      <label class="field">
+        <span>{{ 'users.username' | t }}</span>
+        <input type="text" formControlName="username" maxlength="255" autocomplete="off" />
+      </label>
+      <label class="field">
+        <span>{{ 'users.password' | t }}</span>
+        <input type="password" formControlName="password" autocomplete="new-password" />
+      </label>
+      <label class="field">
+        <span>{{ 'users.displayName' | t }}</span>
+        <input type="text" formControlName="displayName" maxlength="255" />
+      </label>
+      <label class="field wide">
+        <span>{{ 'users.roles' | t }}</span>
+        <input type="text" formControlName="rolesCsv" [placeholder]="'users.rolesPlaceholder' | t" maxlength="512" />
+      </label>
+      <button type="submit" class="primary" [disabled]="saving()">
+        {{ saving() ? ('common.saving' | t) : ('users.createUser' | t) }}
+      </button>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2>{{ 'users.users' | t }}</h2>
+    @if (loading() && users().length === 0) {
+      <p class="muted">{{ 'users.loadingUsers' | t }}</p>
+    } @else if (users().length === 0) {
+      <p class="muted">{{ 'users.noUsers' | t }}</p>
+    } @else {
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>{{ 'users.username' | t }}</th>
+              <th>{{ 'users.displayName' | t }}</th>
+              <th>{{ 'users.roles' | t }}</th>
+              <th>{{ 'users.enabled' | t }}</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (u of users(); track u.id) {
+              <tr>
+                <td class="mono">{{ u.username }}</td>
+                <td>{{ u.displayName ?? ('common.emptyDash' | t) }}</td>
+                <td class="roles">{{ rolesLabel(u.roles) }}</td>
+                <td>
+                  @if (u.enabled !== false) {
+                    <span class="pill ok">{{ 'common.yes' | t }}</span>
+                  } @else {
+                    <span class="pill off">{{ 'common.no' | t }}</span>
+                  }
+                </td>
+                <td class="actions">
+                  <button type="button" class="small" (click)="toggleEnabled(u)">
+                    {{ u.enabled === false ? ('users.enable' | t) : ('users.disable' | t) }}
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </section>
+</div>

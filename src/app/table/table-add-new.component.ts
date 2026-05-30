@@ -5,6 +5,8 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { catchError, finalize, forkJoin, map, of } from 'rxjs';
 
+import { LocaleService } from '../i18n/locale.service';
+import { TranslatePipe } from '../i18n/translate.pipe';
 import type { Zone } from '../zone/zone.model';
 import { ZoneService } from '../zone/zone.service';
 import { TableService } from './table.service';
@@ -12,7 +14,7 @@ import { TableService } from './table.service';
 @Component({
   selector: 'app-table-add-new',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, TranslatePipe],
   templateUrl: './table-add-new.component.html',
   styleUrl: './table-add-new.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -22,6 +24,7 @@ export class TableAddNewComponent {
   private readonly tableService = inject(TableService);
   private readonly zoneService = inject(ZoneService);
   private readonly router = inject(Router);
+  private readonly i18n = inject(LocaleService);
 
   readonly submitting = signal(false);
   readonly errorMessage = signal<string | null>(null);
@@ -165,8 +168,13 @@ export class TableAddNewComponent {
       if (typeof err.error === 'string' && err.error.length > 0) {
         return err.error;
       }
-      return err.message || `Request failed (${err.status})`;
+      return (
+        err.message ||
+        this.i18n.translate('common.requestFailedHttp', { status: err.status })
+      );
     }
-    return 'Could not create table.';
+    return this.i18n.translate('common.couldNotCreate', {
+      entity: this.i18n.translate('table.entity'),
+    });
   }
 }

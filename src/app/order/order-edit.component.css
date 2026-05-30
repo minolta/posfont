@@ -56,7 +56,8 @@ label {
 }
 
 input,
-select {
+select,
+textarea {
   font: inherit;
   padding: 0.5rem 0.65rem;
   border: 1px solid #c8c8c8;
@@ -65,7 +66,8 @@ select {
 }
 
 input:focus,
-select:focus {
+select:focus,
+textarea:focus {
   outline: 2px solid #2563eb;
   outline-offset: 1px;
   border-color: #2563eb;
@@ -199,6 +201,64 @@ code {
   margin: 0;
 }
 
+.paid-note-block {
+  border: 1px solid #e2e2e2;
+  border-radius: 8px;
+  padding: 1rem 1rem 1.1rem;
+  margin: 0 0 1.25rem;
+  background: #fafafa;
+}
+
+.paid-note-heading {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.paid-note-hint {
+  margin: 0 0 0.75rem;
+}
+
+.paid-note-label {
+  display: block;
+  margin: 0 0 0.35rem;
+}
+
+.paid-note-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 0.65rem;
+  min-height: 5rem;
+  resize: vertical;
+  line-height: 1.4;
+}
+
+.paid-note-save {
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0.45rem 0.9rem;
+  border-radius: 6px;
+  border: 1px solid #c7d2fe;
+  background: #eef2ff;
+  color: #3730a3;
+  cursor: pointer;
+}
+
+.paid-note-save:hover:not(:disabled) {
+  background: #e0e7ff;
+}
+
+.paid-note-save:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.order-note-readonly {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .lines-block {
   border: 1px solid #e2e2e2;
   border-radius: 8px;
@@ -222,7 +282,7 @@ code {
   display: grid;
   grid-template-columns: 1fr 5rem auto;
   gap: 0.65rem 0.75rem;
-  align-items: end;
+  align-items: start;
   margin-bottom: 0.75rem;
   padding-bottom: 0.75rem;
   border-bottom: 1px dashed #e5e5e5;
@@ -234,8 +294,20 @@ code {
   padding-bottom: 0;
 }
 
+.line-note-field {
+  grid-column: 1 / -1;
+}
+
+.line-note-field textarea {
+  resize: vertical;
+  min-height: 2.75rem;
+  line-height: 1.35;
+  width: 100%;
+}
+
 .line-food label,
-.line-qty label {
+.line-qty label,
+.line-note-field label {
   font-size: 0.7rem;
 }
 

@@ -11,13 +11,15 @@ import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { catchError, combineLatest, finalize, map, of, switchMap, timer } from 'rxjs';
 
+import { LocaleService } from '../i18n/locale.service';
+import { TranslatePipe } from '../i18n/translate.pipe';
 import type { Zone } from './zone.model';
 import { ZoneService } from './zone.service';
 
 @Component({
   selector: 'app-zone-list',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, TranslatePipe],
   templateUrl: './zone-list.component.html',
   styleUrl: './zone-list.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -25,6 +27,7 @@ import { ZoneService } from './zone.service';
 export class ZoneListComponent {
   private readonly zoneService = inject(ZoneService);
   private readonly route = inject(ActivatedRoute);
+  private readonly i18n = inject(LocaleService);
 
   private readonly brokenPictureIds = signal<Set<number>>(new Set());
   readonly lightboxZone = signal<Zone | null>(null);
@@ -63,7 +66,11 @@ export class ZoneListComponent {
           switchMap(() =>
             this.zoneService.searchZones(trimmed || undefined).pipe(
               catchError(() => {
-                this.error.set('Could not load zones. Check that the API is running.');
+                this.error.set(
+                  this.i18n.translate('common.couldNotLoad', {
+                    entity: this.i18n.translate('zone.entity'),
+                  }),
+                );
                 return of([] as Zone[]);
               }),
               finalize(() => this.loading.set(false)),
@@ -99,6 +106,16 @@ export class ZoneListComponent {
       });
   }
 
+  viewPhotoLabel(z: Zone): string {
+    const name = z.name?.trim() || z.code;
+    return this.i18n.translate('common.viewPhoto', { name });
+  }
+
+  photoDialogLabel(z: Zone): string {
+    const name = z.name?.trim() || z.code;
+    return this.i18n.translate('common.photoOf', { name });
+  }
+
   private extractErrorMessage(err: unknown): string {
     if (err instanceof HttpErrorResponse) {
       const body = err.error;
@@ -112,7 +129,7 @@ export class ZoneListComponent {
         return err.error;
       }
     }
-    return 'Could not delete zone. Check API connectivity and dependencies.';
+    return this.i18n.translate('zone.deleteError');
   }
 
   pictureSrc(z: Zone): string | null {

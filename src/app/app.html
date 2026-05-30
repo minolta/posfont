@@ -1,34 +1,53 @@
 <div class="app-shell">
-  <header class="app-header">
-    <span class="brand">{{ title() }}</span>
-    <nav>
-      <a routerLink="/orders" routerLinkActive="active">Orders</a>
-      <a routerLink="/orders/new" routerLinkActive="active">New order</a>
-      <a routerLink="/foods" routerLinkActive="active">Foods</a>
-      <a routerLink="/foods/new" routerLinkActive="active">Add food</a>
-      <a routerLink="/food-categories" routerLinkActive="active">Categories</a>
-      <a routerLink="/food-categories/new" routerLinkActive="active">New category</a>
-      <a routerLink="/kitchens" routerLinkActive="active">Kitchens</a>
-      <a routerLink="/kitchens/new" routerLinkActive="active">Add kitchen</a>
-      <a routerLink="/zones" routerLinkActive="active">Zones</a>
-      <a routerLink="/zones/new" routerLinkActive="active">Add zone</a>
-      <a routerLink="/tables" routerLinkActive="active">Tables</a>
-      <a routerLink="/tables/new" routerLinkActive="active">Add table</a>
-    </nav>
-    <label class="user-id-field">
-      <span class="user-id-label">User ID</span>
-      <input
-        type="number"
-        min="1"
-        step="1"
-        class="user-id-input"
-        placeholder="Operator"
-        [value]="userIdInputValue()"
-        (input)="onUserIdInput($any($event.target).value)"
-        title="Saved in session; sent as userId on new orders and new lines"
-      />
-    </label>
-  </header>
+  @if (staffChromeVisible()) {
+    <header class="app-header">
+      <span class="brand">{{ title() }}</span>
+      <nav [attr.aria-label]="'nav.main' | t">
+        <div class="nav-desktop">
+          @for (link of navLinks(); track link.path) {
+            @if (link.dividerBefore) {
+              <span class="nav-divider" aria-hidden="true"></span>
+            }
+            <a
+              [routerLink]="link.path"
+              routerLinkActive="active"
+              [routerLinkActiveOptions]="{ exact: link.exact !== false }"
+              >{{ link.labelKey | t }}</a
+            >
+          }
+          <span class="nav-divider" aria-hidden="true"></span>
+          @if (jwtAuth.isAuthenticated()) {
+            <button type="button" class="nav-button" (click)="logout()">{{ 'nav.signOut' | t }}</button>
+          } @else {
+            <a routerLink="/login" routerLinkActive="active">{{ 'nav.signIn' | t }}</a>
+          }
+          <app-lang-switch />
+        </div>
+
+        <div class="nav-mobile">
+          <label class="nav-mobile-label" for="nav-mobile-select">{{ 'nav.menu' | t }}</label>
+          <select
+            id="nav-mobile-select"
+            class="nav-mobile-select"
+            [value]="navPath()"
+            (change)="onMobileNavChange($event)"
+          >
+            @for (link of navLinks(); track link.path) {
+              <option [value]="link.path">{{ link.labelKey | t }}</option>
+            }
+          </select>
+          @if (jwtAuth.isAuthenticated()) {
+            <button type="button" class="nav-button nav-button--compact" (click)="logout()">
+              {{ 'nav.signOut' | t }}
+            </button>
+          } @else {
+            <a routerLink="/login" routerLinkActive="active" class="nav-mobile-auth">{{ 'nav.signIn' | t }}</a>
+          }
+          <app-lang-switch />
+        </div>
+      </nav>
+    </header>
+  }
   <main class="app-main">
     <router-outlet />
   </main>

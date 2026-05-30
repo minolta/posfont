@@ -1,7 +1,18 @@
-import { DecimalPipe } from '@angular/common';
+import { DecimalPipe, DOCUMENT, Location } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  afterNextRender,
+  ChangeDetectionStrategy,
+  Component,
+  effect,
+  ElementRef,
+  inject,
+  Injector,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
   catchError,
@@ -10,24 +21,26 @@ import {
   map,
   of,
   switchMap,
+  throwError,
   timer,
 } from 'rxjs';
 
 import type { Zone } from '../zone/zone.model';
+import { PromptPayQrDisplayComponent } from '../payment/promptpay-qr-display.component';
+import { UrlQrService } from '../payment/url-qr.service';
+import { LocaleService } from '../i18n/locale.service';
+import { TranslatePipe } from '../i18n/translate.pipe';
 import {
   orderRequestCompleteAllExceptCanceled,
   resolvedLineStatus,
 } from '../order/order-line-status.util';
+import { buildPayOrderRequest, mergePayOrderAmounts, readPosOrderNote } from '../order/order-pay.util';
 import {
-  computePaySettlement,
-  lineUnitPrice,
-  orderIsPaid,
-  orderPayStateForPut,
-  orderSettlementForPut,
-  type OrderLine,
-  type OrderRequest,
-  type PosOrder,
-} from '../order/order.model';
+  CustomerDisplaySessionService,
+  CUSTOMER_DISPLAY_WINDOW_NAME,
+} from '../order/customer-display-session.service';
+import { pingOrderCustomerDisplayRefresh } from '../order/order-customer-display-sync';
+import type { OrderLine, OrderLineStatus, PayOrderRequest, PosOrder } from '../order/order.model';
 import { OrderService } from '../order/order.service';
 import type { PosTable } from './table.model';
 import { TableService } from './table.service';
@@ -35,7 +48,7 @@ import { TableService } from './table.service';
 @Component({
   selector: 'app-table-list',
   standalone: true,
-  imports: [DecimalPipe, RouterLink],
+  imports: [DecimalPipe, FormsModule, RouterLink, PromptPayQrDisplayComponent, TranslatePipe],
   templateUrl: './table-list.component.html',
   styleUrl: './table-list.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -45,6 +58,13 @@ export class TableListComponent {
   private readonly orderService = inject(OrderService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly location = inject(Location);
+  private readonly document = inject(DOCUMENT);
+  private readonly urlQrService = inject(UrlQrService);
+  private readonly customerDisplaySession = inject(CustomerDisplaySessionService);
+  private readonly injector = inject(Injector);
+  private readonly i18n = inject(LocaleService);
+  private readonly payAmountInputRef = viewChild<ElementRef<HTMLInputElement>>('payAmountInput');
 
   readonly createdId = toSignal(
     this.route.queryParamMap.pipe(map((p) => p.get('created'))),
@@ -53,6 +73,12 @@ export class TableListComponent {
 
   readonly updatedId = toSignal(
     this.route.queryParamMap.pipe(map((p) => p.get('updated'))),
+    { initialValue: null as string | null },
+  );
+
+  /** Shown after creating an order from New order (`/tables?newOrder=…`). */
+  readonly newOrderId = toSignal(
+    this.route.queryParamMap.pipe(map((p) => p.get('newOrder'))),
     { initialValue: null as string | null },
   );
 
@@ -65,8 +91,20 @@ export class TableListComponent {
   readonly payingOrderId = signal<number | null>(null);
   readonly payError = signal<string | null>(null);
   readonly payDialogOrderId = signal<number | null>(null);
+  /** Fresh `GET /orders/{id}` while Settle payment is open — includes whole-order `note` when list does not. */
+  readonly payDialogOrderDetail = signal<PosOrder | null>(null);
+  readonly payDialogNoteDraft = signal('');
+  readonly payDialogNoteError = signal<string | null>(null);
   readonly payInputAmount = signal<string>('');
   readonly orderRefreshNonce = signal(0);
+
+  /** Table id when “Order QR” dialog is open; `null` when closed. */
+  readonly orderEntryQrTableId = signal<number | null>(null);
+  /** Table code (and zone) shown above the QR image. */
+  readonly orderEntryQrTableLabel = signal('');
+  readonly orderEntryQrUrl = signal('');
+  readonly orderEntryQrDataUrl = signal<string | null>(null);
+  readonly orderEntryQrError = signal<string | null>(null);
 
   readonly openOrdersByTable = toSignal(
     toObservable(this.orderRefreshNonce).pipe(
@@ -75,7 +113,7 @@ export class TableListComponent {
         const byTable = new Map<number, PosOrder>();
         for (const o of orders) {
           const tableId = o.table?.id;
-          if (tableId != null && o.id != null && !orderIsPaid(o) && !o.cancel && !byTable.has(tableId)) {
+          if (tableId != null && o.id != null && !o.paid && !o.cancel && !byTable.has(tableId)) {
             byTable.set(tableId, o);
           }
         }
@@ -85,32 +123,6 @@ export class TableListComponent {
     ),
     { initialValue: new Map<number, PosOrder>() },
   );
-
-  readonly payDialogChangePreview = computed(() => {
-    const id = this.payDialogOrderId();
-    if (id == null) {
-      return 0;
-    }
-    let order: PosOrder | undefined;
-    for (const o of this.openOrdersByTable().values()) {
-      if (o.id === id) {
-        order = o;
-        break;
-      }
-    }
-    if (order == null) {
-      return 0;
-    }
-    const raw = this.payInputAmount().trim();
-    if (raw === '') {
-      return 0;
-    }
-    const tendered = Number(raw);
-    if (!Number.isFinite(tendered)) {
-      return 0;
-    }
-    return computePaySettlement(this.payableTotal(order), tendered).change;
-  });
 
   readonly tables = toSignal(
     combineLatest([toObservable(this.searchTerm), toObservable(this.refreshNonce)]).pipe(
@@ -122,7 +134,11 @@ export class TableListComponent {
           switchMap(() =>
             this.tableService.searchTables(trimmed || undefined).pipe(
               catchError(() => {
-                this.error.set('Could not load tables. Check that the API is running.');
+                this.error.set(
+                  this.i18n.translate('common.couldNotLoad', {
+                    entity: this.i18n.translate('table.entity'),
+                  }),
+                );
                 return of([] as PosTable[]);
               }),
               finalize(() => this.loading.set(false)),
@@ -133,6 +149,22 @@ export class TableListComponent {
     ),
     { initialValue: [] as PosTable[] },
   );
+
+  constructor() {
+    effect(() => {
+      if (this.payDialogOrderId() == null) {
+        return;
+      }
+      afterNextRender(
+        () => {
+          const el = this.payAmountInputRef()?.nativeElement;
+          el?.focus();
+          el?.select();
+        },
+        { injector: this.injector },
+      );
+    });
+  }
 
   onSearchInput(value: string): void {
     this.searchTerm.set(value);
@@ -153,7 +185,14 @@ export class TableListComponent {
       .subscribe({
         next: () => this.refreshNonce.update((n) => n + 1),
         error: (err: unknown) => {
-          this.deleteError.set(this.extractErrorMessage(err));
+          this.deleteError.set(
+            this.extractErrorMessage(
+              err,
+              this.i18n.translate('common.couldNotDelete', {
+                entity: this.i18n.translate('table.entity'),
+              }),
+            ),
+          );
         },
       });
   }
@@ -168,23 +207,105 @@ export class TableListComponent {
       return;
     }
     void this.router.navigate(['/orders/new/line-picker'], {
-      queryParams: { tableId },
+      queryParams: {
+        tableId,
+        ...((t.code ?? '').trim() ? { tableCode: (t.code ?? '').trim() } : {}),
+      },
     });
+  }
+
+  /**
+   * Opens a dialog with a QR code that encodes the same URL as “New order” for this table
+   * (`/orders/new/line-picker?tableId=…`), for scanning on a phone.
+   */
+  async openOrderEntryQrDialog(t: PosTable): Promise<void> {
+    const tableId = t.id;
+    if (tableId == null) {
+      return;
+    }
+    this.orderEntryQrError.set(null);
+    this.orderEntryQrDataUrl.set(null);
+    this.orderEntryQrTableId.set(tableId);
+    this.orderEntryQrTableLabel.set(this.tableOrderQrCaption(t));
+    const href = this.newOrderUrlForTable(tableId, t.code);
+    this.orderEntryQrUrl.set(href);
+    const dataUrl = await this.urlQrService.toDataUrl(href);
+    if (dataUrl == null) {
+      this.orderEntryQrError.set(this.i18n.translate('common.requestFailed'));
+    } else {
+      this.orderEntryQrDataUrl.set(dataUrl);
+    }
+  }
+
+  closeOrderEntryQrDialog(): void {
+    this.orderEntryQrTableId.set(null);
+    this.orderEntryQrTableLabel.set('');
+    this.orderEntryQrUrl.set('');
+    this.orderEntryQrDataUrl.set(null);
+    this.orderEntryQrError.set(null);
+  }
+
+  copyOrderEntryLink(): void {
+    const url = this.orderEntryQrUrl().trim();
+    if (url.length === 0) {
+      return;
+    }
+    void navigator.clipboard.writeText(url);
+  }
+
+  /** Guest/menu URL (`/guest/order`). Guests pick table on device; QR no longer pins `tableId`. */
+  newOrderUrlForTable(_tableId: number, _codeRaw?: string): string {
+    const tree = this.router.createUrlTree(['/guest/order']);
+    const serialized = this.router.serializeUrl(tree);
+    const path = this.location.prepareExternalUrl(serialized);
+    return new URL(path, this.document.baseURI).href;
   }
 
   openPayDialogForTable(tableId: number): void {
     const order = this.openOrderByTable(tableId);
     if (!order || order.id == null) {
-      this.payError.set('No unpaid open order found for this table.');
+      this.payError.set(this.i18n.translate('common.notFound', { entity: this.i18n.translate('order.entity') }));
       return;
     }
     this.payError.set(null);
     this.payInputAmount.set(this.payableTotal(order).toFixed(2));
+    this.payDialogOrderDetail.set(null);
+    this.payDialogNoteDraft.set(readPosOrderNote(order) ?? '');
+    this.payDialogNoteError.set(null);
     this.payDialogOrderId.set(order.id);
+    this.refreshPayDialogOrderFromApi(order.id);
+    this.customerDisplaySession.focusOrder(order.id);
+  }
+
+  private refreshPayDialogOrderFromApi(orderId: number): void {
+    this.orderService.getOrderById(orderId).subscribe({
+      next: (full) => {
+        if (this.payDialogOrderId() === orderId && full) {
+          this.payDialogOrderDetail.set(full);
+          this.payDialogNoteDraft.set(readPosOrderNote(full) ?? '');
+        }
+      },
+      error: () => {
+        /* map entry still drives the dialog */
+      },
+    });
+  }
+
+  /** Customer-facing summary + PromptPay QR in a new tab (for a tablet facing the guest). */
+  openCustomerDisplayPage(orderId: number | null | undefined): void {
+    if (orderId == null) {
+      return;
+    }
+    this.customerDisplaySession.focusOrder(orderId);
+    const url = this.router.serializeUrl(this.router.createUrlTree(['/orders', 'display']));
+    window.open(url, CUSTOMER_DISPLAY_WINDOW_NAME);
   }
 
   closePayDialog(): void {
     this.payDialogOrderId.set(null);
+    this.payDialogOrderDetail.set(null);
+    this.payDialogNoteDraft.set('');
+    this.payDialogNoteError.set(null);
     this.payInputAmount.set('');
   }
 
@@ -192,6 +313,10 @@ export class TableListComponent {
     const orderId = this.payDialogOrderId();
     if (orderId == null) {
       return undefined;
+    }
+    const detail = this.payDialogOrderDetail();
+    if (detail != null && detail.id === orderId) {
+      return detail;
     }
     for (const o of this.openOrdersByTable().values()) {
       if (o.id === orderId) {
@@ -208,45 +333,121 @@ export class TableListComponent {
       return;
     }
     const amount = Number(this.payInputAmount());
-    if (!Number.isFinite(amount) || amount < 0) {
-      this.payError.set('Please enter a valid cash amount from the customer.');
+    const rawPay = buildPayOrderRequest(amount, this.payableTotal(order));
+    if ('error' in rawPay) {
+      this.payError.set(this.i18n.translate(rawPay.error));
       return;
     }
-    if (order.table?.id == null) {
-      this.payError.set('Order has no table reference and cannot be paid.');
+    this.submitPaymentFromDialog(order, rawPay);
+  }
+
+  confirmPayQrFromDialog(): void {
+    const order = this.payDialogOrder();
+    if (!order || order.id == null) {
+      this.closePayDialog();
+      return;
+    }
+    if (this.payQrSettlementDisabled(order)) {
+      this.payError.set(this.i18n.translate('order.qrExactTotal'));
+      return;
+    }
+    const due = this.payableTotal(order);
+    const rawPay = buildPayOrderRequest(due, due);
+    if ('error' in rawPay) {
+      this.payError.set(this.i18n.translate(rawPay.error));
+      return;
+    }
+    this.submitPaymentFromDialog(order, { ...rawPay, paidByQrScan: true });
+  }
+
+  confirmPayCreditFromDialog(): void {
+    const order = this.payDialogOrder();
+    if (!order || order.id == null) {
+      this.closePayDialog();
+      return;
+    }
+    if (this.payQrSettlementDisabled(order)) {
+      this.payError.set(this.i18n.translate('order.creditExactTotal'));
+      return;
+    }
+    const due = this.payableTotal(order);
+    const rawPay = buildPayOrderRequest(due, due);
+    if ('error' in rawPay) {
+      this.payError.set(this.i18n.translate(rawPay.error));
+      return;
+    }
+    this.submitPaymentFromDialog(order, { ...rawPay, paidByCredit: true });
+  }
+
+  /** Paid by QR only when the entered amount equals the total (no under/over pay). */
+  payQrSettlementDisabled(order: PosOrder): boolean {
+    const id = order.id ?? 0;
+    if (this.payingOrderId() === id || id <= 0) {
+      return true;
+    }
+    const raw = this.payInputAmount().trim();
+    if (raw === '') {
+      return true;
+    }
+    const amt = Number(raw);
+    if (!Number.isFinite(amt) || amt < 0) {
+      return true;
+    }
+    const due = this.payableTotal(order);
+    if (!Number.isFinite(due)) {
+      return true;
+    }
+    const tenderCents = Math.round(amt * 100);
+    const dueCents = Math.round(due * 100);
+    if (tenderCents < dueCents || tenderCents > dueCents) {
+      return true;
+    }
+    return false;
+  }
+
+  private submitPaymentFromDialog(order: PosOrder, payBody: PayOrderRequest): void {
+    if (order.id == null || order.table?.id == null) {
+      this.payError.set(this.i18n.translate('order.noTablePay'));
       return;
     }
     const id = order.id;
-    /** Always send every non-canceled line as COMPLETE on pay — many APIs keep `paid` false if any line is still WAIT. */
-    const lineUpdateBody = orderRequestCompleteAllExceptCanceled(order);
-    if (lineUpdateBody == null) {
-      this.payError.set('Could not build line update for payment.');
-      return;
-    }
-    const settlement = computePaySettlement(this.payableTotal(order), amount);
-    const paidAt = new Date().toISOString().slice(0, 19);
-    const updatePayload: OrderRequest = {
-      ...lineUpdateBody,
-      ...orderSettlementForPut(settlement),
-      ...orderPayStateForPut(paidAt),
-      complateOrder: true,
-      complateOrderDate: paidAt,
-    };
+    /** Whole-order note from the dialog — saved on the same PUT as payment (no separate PATCH). */
+    const draft = this.payDialogNoteDraft().trim().slice(0, 2000);
+
     this.payingOrderId.set(id);
     this.payError.set(null);
-    const pay$ = this.orderService.updateOrder(id, updatePayload);
-    pay$
-      .pipe(finalize(() => this.payingOrderId.set(null)))
+    this.payDialogNoteError.set(null);
+
+    this.orderService
+      .getOrderRowById(id)
+      .pipe(
+        switchMap((fresh) => {
+          const baseBody = orderRequestCompleteAllExceptCanceled(fresh);
+          if (baseBody == null) {
+            return throwError(
+              () => new Error(this.i18n.translate('order.noTableUpdate')),
+            );
+          }
+          const prepBody = mergePayOrderAmounts({ ...baseBody, note: draft }, payBody);
+          return this.orderService.updateOrder(id, prepBody).pipe(
+            switchMap(() => this.orderService.payOrder(id, payBody)),
+          );
+        }),
+        finalize(() => this.payingOrderId.set(null)),
+      )
       .subscribe({
         next: () => {
+          this.customerDisplaySession.focusOrder(id);
           this.closePayDialog();
           this.orderRefreshNonce.update((n) => n + 1);
         },
         error: (err: unknown) => {
-          this.payError.set(
-            this.httpErrorDetail(err) ||
-              'Could not record payment (order update failed, already paid, or the API is unreachable).',
+          const message = this.extractErrorMessage(
+            err,
+            this.i18n.translate('common.requestFailed'),
           );
+          this.payError.set(message);
+          this.payDialogNoteError.set(message);
         },
       });
   }
@@ -260,11 +461,25 @@ export class TableListComponent {
       if (this.lineStatus(line, order) === 'CANCEL') {
         return sum;
       }
-      return sum + line.quantity * lineUnitPrice(line);
+      return sum + line.quantity * line.unitPrice;
     }, 0);
   }
 
-  lineStatus(line: OrderLine, order: PosOrder): 'WAIT' | 'COMPLETE' | 'CANCEL' {
+  /** Cash change when the entered amount is greater than the payable total (cent-safe). */
+  payDialogChange(order: PosOrder): number {
+    const tendered = Number(this.payInputAmount());
+    const due = this.payableTotal(order);
+    if (!Number.isFinite(tendered) || !Number.isFinite(due)) {
+      return 0;
+    }
+    const cents = Math.round(tendered * 100) - Math.round(due * 100);
+    if (cents <= 0) {
+      return 0;
+    }
+    return cents / 100;
+  }
+
+  lineStatus(line: OrderLine, order: PosOrder): OrderLineStatus {
     return resolvedLineStatus(line, order);
   }
 
@@ -282,7 +497,7 @@ export class TableListComponent {
   openAddLineForTable(tableId: number): void {
     const order = this.openOrderByTable(tableId);
     if (!order || order.id == null) {
-      this.payError.set('No unpaid open order found for this table.');
+      this.payError.set(this.i18n.translate('common.notFound', { entity: this.i18n.translate('order.entity') }));
       return;
     }
     void this.router.navigate(['/orders/new/line-picker'], {
@@ -302,8 +517,15 @@ export class TableListComponent {
     return this.payableTotal(order);
   }
 
-  private extractErrorMessage(err: unknown): string {
-    return this.httpErrorDetail(err) || 'Could not delete table. Check API connectivity and dependencies.';
+  private extractErrorMessage(err: unknown, fallback: string): string {
+    const d = this.httpErrorDetail(err);
+    if (d) {
+      return d;
+    }
+    if (err instanceof Error && err.message.trim().length > 0) {
+      return err.message;
+    }
+    return fallback;
   }
 
   private httpErrorDetail(err: unknown): string {
@@ -318,19 +540,37 @@ export class TableListComponent {
       if (typeof err.error === 'string' && err.error.trim().length > 0) {
         return err.error;
       }
+      if (err.status >= 400) {
+        return this.i18n.translate('common.requestFailedHttp', { status: err.status });
+      }
     }
     return '';
   }
 
+  /** Short label for the Order QR dialog (table code + zone when present). */
+  tableOrderQrCaption(t: PosTable): string {
+    const code = (t.code ?? '').trim() || (t.id != null ? `${this.i18n.translate('common.table')} #${t.id}` : this.i18n.translate('common.table'));
+    const z = this.zoneCell(t.zone);
+    const dash = this.i18n.translate('common.emptyDash');
+    if (z && z !== dash) {
+      return `${code} · ${z}`;
+    }
+    return code;
+  }
+
   zoneCell(z: Zone | null | undefined): string {
     if (!z) {
-      return '—';
+      return this.i18n.translate('common.emptyDash');
     }
     const name = (z.name ?? '').trim();
     const code = (z.code ?? '').trim();
     if (name && code) {
       return `${name} (${code})`;
     }
-    return name || code || '—';
+    return name || code || this.i18n.translate('common.emptyDash');
+  }
+
+  orderQrAltLabel(): string {
+    return this.i18n.translate('table.qrAlt');
   }
 }

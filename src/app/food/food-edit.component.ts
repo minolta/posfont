@@ -16,14 +16,16 @@ import {
 } from 'rxjs';
 
 import { FoodCategoryService } from '../food-category/food-category.service';
-import type { Food, FoodCategory, Kitchen } from './food.model';
+import { LocaleService } from '../i18n/locale.service';
+import { TranslatePipe } from '../i18n/translate.pipe';
+import { foodBlocksOrderLines, type Food, type FoodCategory, type Kitchen } from './food.model';
 import { FoodService } from './food.service';
 import { KitchenService } from '../kitchen/kitchen.service';
 
 @Component({
   selector: 'app-food-edit',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, TranslatePipe],
   templateUrl: './food-edit.component.html',
   styleUrl: './food-edit.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -35,6 +37,7 @@ export class FoodEditComponent {
   private readonly foodService = inject(FoodService);
   private readonly kitchenService = inject(KitchenService);
   private readonly foodCategoryService = inject(FoodCategoryService);
+  private readonly i18n = inject(LocaleService);
 
   readonly loading = signal(true);
   readonly loadError = signal<string | null>(null);
@@ -107,6 +110,8 @@ export class FoodEditComponent {
     code: ['', [Validators.required, Validators.pattern(/\S/)]],
     name: ['', [Validators.required, Validators.pattern(/\S/)]],
     basePrice: [0, [Validators.required, Validators.min(0)]],
+    /** When true, staff cannot put this SKU on orders (shows in Foods list checkbox). */
+    blockOrderLine: [false],
     kitchenId: [''],
     manualKitchenQuery: [''],
     foodCategoryId: ['', Validators.required],
@@ -120,7 +125,11 @@ export class FoodEditComponent {
         switchMap((id) => {
           if (!Number.isFinite(id) || id < 1) {
             this.loading.set(false);
-            this.loadError.set('Invalid food id.');
+            this.loadError.set(
+              this.i18n.translate('common.invalidId', {
+                entity: this.i18n.translate('food.entity'),
+              }),
+            );
             this.foodId.set(null);
             return EMPTY;
           }
@@ -129,7 +138,11 @@ export class FoodEditComponent {
           this.loadError.set(null);
           return this.foodService.getFoodById(id).pipe(
             catchError(() => {
-              this.loadError.set('Could not load food.');
+              this.loadError.set(
+                this.i18n.translate('common.couldNotLoad', {
+                  entity: this.i18n.translate('food.entity'),
+                }),
+              );
               return of(undefined as Food | undefined);
             }),
             finalize(() => this.loading.set(false)),
@@ -140,7 +153,11 @@ export class FoodEditComponent {
       .subscribe((food) => {
         if (!food) {
           if (!this.loadError()) {
-            this.loadError.set('Food not found.');
+            this.loadError.set(
+              this.i18n.translate('common.notFound', {
+                entity: this.i18n.translate('food.entity'),
+              }),
+            );
           }
           return;
         }
@@ -152,6 +169,7 @@ export class FoodEditComponent {
           code: food.code,
           name: food.name ?? '',
           basePrice: food.basePrice,
+          blockOrderLine: foodBlocksOrderLines(food),
           kitchenId: kid != null ? String(kid) : '',
           manualKitchenQuery: '',
           foodCategoryId: cid != null ? String(cid) : '',
@@ -288,7 +306,11 @@ export class FoodEditComponent {
     const v = this.form.getRawValue();
     const foodCategoryId = Number(v.foodCategoryId);
     if (!Number.isFinite(foodCategoryId) || foodCategoryId < 1) {
-      this.saveError.set('Choose a category or enter a valid category id.');
+      this.saveError.set(
+        this.i18n.translate('common.choose', {
+          entity: this.i18n.translate('common.category'),
+        }),
+      );
       return;
     }
     this.submitting.set(true);
@@ -302,6 +324,7 @@ export class FoodEditComponent {
             kitchenId,
             foodCategoryId,
             version: Number(v.version),
+            blockOrderLine: !!v.blockOrderLine,
           }),
         ),
         finalize(() => this.submitting.set(false)),
@@ -327,25 +350,27 @@ export class FoodEditComponent {
     if (lists.kitchens.length > 0) {
       const kid = Number(v.kitchenId);
       if (!Number.isFinite(kid) || kid < 1) {
-        return throwError(() => new Error('Choose a kitchen from the list.'));
+        return throwError(
+          () =>
+            new Error(
+              this.i18n.translate('common.choose', {
+                entity: this.i18n.translate('common.kitchen'),
+              }),
+            ),
+        );
       }
       return of(kid);
     }
     const q = (v.manualKitchenQuery ?? '').trim();
     if (!q) {
-      return throwError(() => new Error('Enter kitchen name, code, or id.'));
+      return throwError(() => new Error(this.i18n.translate('food.kitchenPlaceholder')));
     }
     return this.kitchenService.searchKitchens(q).pipe(
       map((ks) => this.pickSingleKitchenId(ks, q)),
       switchMap((kid) =>
         kid != null
           ? of(kid)
-          : throwError(
-              () =>
-                new Error(
-                  'No unique kitchen match. Use the exact code, full name, or numeric id, or narrow your search.',
-                ),
-            ),
+          : throwError(() => new Error(this.i18n.translate('food.resolveKitchen'))),
       ),
     );
   }
@@ -394,8 +419,13 @@ export class FoodEditComponent {
       if (typeof err.error === 'string' && err.error.length > 0) {
         return err.error;
       }
-      return err.message || `Request failed (${err.status})`;
+      return (
+        err.message ||
+        this.i18n.translate('common.requestFailedHttp', { status: err.status })
+      );
     }
-    return 'Could not save food.';
+    return this.i18n.translate('common.couldNotSave', {
+      entity: this.i18n.translate('food.entity'),
+    });
   }
 }

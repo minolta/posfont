@@ -1,0 +1,11 @@
+@if (dataUrl(); as src) {
+  <div class="promptpay-wrap" [attr.aria-label]="'payment.qrCode' | t">
+    <p class="promptpay-heading">{{ 'payment.promptPay' | t }}</p>
+    <img class="promptpay-img" [src]="src" width="220" height="220" alt="" />
+    <p class="promptpay-amount">
+      <span class="mono">{{ amountBaht() | number: '1.2-2' }}</span>
+      <span class="thb-suffix">{{ 'payment.thb' | t }}</span>
+    </p>
+    <p class="hint">{{ 'payment.qrHint' | t }}</p>
+  </div>
+}

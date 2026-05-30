@@ -1,0 +1,25 @@
+<div class="guest-done">
+  <div class="guest-lang-bar">
+    <app-lang-switch class="lang-switch--light" />
+  </div>
+  <div class="icon" aria-hidden="true">✓</div>
+  @if (mode() === 'paid') {
+    <h1>{{ 'guest.paymentRecorded' | t }}</h1>
+    @if (tableCode()) {
+      <p class="table-line">{{ 'common.table' | t }} <span class="mono">{{ tableCode() }}</span></p>
+    }
+    <p class="sub">{{ 'guest.thankYouReturn' | t }}</p>
+  } @else {
+    <h1>{{ 'guest.orderSent' | t }}</h1>
+    @if (tableCode()) {
+      <p class="table-line">{{ 'common.table' | t }} <span class="mono">{{ tableCode() }}</span></p>
+    }
+    @if (mode() === 'add') {
+      <p class="sub">{{ 'guest.addedToOrder' | t }}</p>
+    } @else {
+      <p class="sub">{{ 'guest.bringFood' | t }}</p>
+    }
+  }
+  <a class="cta" routerLink="/guest/order">{{ 'guest.menu' | t }}</a>
+  <p class="cta-follow">{{ 'guest.pickDifferentTable' | t }}</p>
+</div>

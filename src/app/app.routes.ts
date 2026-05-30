@@ -1,8 +1,19 @@
 import { Routes } from '@angular/router';
+import { jwtAuthGuard } from './auth/jwt-auth.guard';
 import { OrderLinePickerComponent } from './order/order-line-picker.component';
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'tables' },
+  {
+    path: 'login',
+    loadComponent: () => import('./auth/login.component').then((m) => m.LoginComponent),
+  },
+  {
+    path: 'users',
+    loadComponent: () =>
+      import('./users/user-management.component').then((m) => m.UserManagementComponent),
+    canActivate: [jwtAuthGuard],
+  },
   {
     path: 'tables/new',
     loadComponent: () =>
@@ -24,8 +35,30 @@ export const routes: Routes = [
       import('./order/order-add-new.component').then((m) => m.OrderAddNewComponent),
   },
   {
+    path: 'guest/order/confirmed',
+    loadComponent: () =>
+      import('./guest/guest-order-confirmed.component').then((m) => m.GuestOrderConfirmedComponent),
+  },
+  {
+    path: 'guest/order',
+    loadComponent: () =>
+      import('./guest/guest-table-order-entry.component').then((m) => m.GuestTableOrderEntryComponent),
+  },
+  {
     path: 'orders/new/line-picker',
     component: OrderLinePickerComponent,
+  },
+  {
+    path: 'orders/display',
+    loadComponent: () =>
+      import('./order/order-customer-display.component').then((m) => m.OrderCustomerDisplayComponent),
+  },
+  {
+    path: 'orders/:id/display',
+    loadComponent: () =>
+      import('./order/customer-display-legacy-redirect.component').then(
+        (m) => m.CustomerDisplayLegacyRedirectComponent,
+      ),
   },
   {
     path: 'orders/:id/edit',
@@ -53,14 +86,19 @@ export const routes: Routes = [
       import('./zone/zone-list.component').then((m) => m.ZoneListComponent),
   },
   {
-    path: 'kitchens/:id/edit',
+    path: 'kitchens/prep',
     loadComponent: () =>
-      import('./kitchen/kitchen-edit.component').then((m) => m.KitchenEditComponent),
+      import('./kitchen/kitchen-prep.component').then((m) => m.KitchenPrepComponent),
   },
   {
     path: 'kitchens/new',
     loadComponent: () =>
       import('./kitchen/kitchen-add-new.component').then((m) => m.KitchenAddNewComponent),
+  },
+  {
+    path: 'kitchens/:id/edit',
+    loadComponent: () =>
+      import('./kitchen/kitchen-edit.component').then((m) => m.KitchenEditComponent),
   },
   {
     path: 'kitchens',
@@ -96,5 +134,28 @@ export const routes: Routes = [
     path: 'foods',
     loadComponent: () =>
       import('./food/food-list.component').then((m) => m.FoodListComponent),
+  },
+  { path: 'backup', redirectTo: 'reports/backup', pathMatch: 'full' },
+  {
+    path: 'manual',
+    loadComponent: () =>
+      import('./manual/user-manual.component').then((m) => m.UserManualComponent),
+  },
+  {
+    path: 'reports',
+    loadComponent: () =>
+      import('./report/reports-layout.component').then((m) => m.ReportsLayoutComponent),
+    children: [
+      { path: '', pathMatch: 'full', redirectTo: 'daily' },
+      {
+        path: 'daily',
+        loadComponent: () =>
+          import('./report/daily-report.component').then((m) => m.DailyReportComponent),
+      },
+      {
+        path: 'backup',
+        loadComponent: () => import('./backup/backup.component').then((m) => m.BackupComponent),
+      },
+    ],
   },
 ];

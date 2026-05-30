@@ -1,38 +1,36 @@
 <div class="zone-list-page">
-  <h1>Zones</h1>
-  <p class="hint">
-    Search matches <span class="mono">code</span> or <span class="mono">name</span> on the server (<code>GET /api/zones?q=</code>). New zones require a photo on the Add form.
-  </p>
+  <h1>{{ 'zone.title' | t }}</h1>
+  <p class="hint">{{ 'zone.hint' | t }}</p>
 
   @if (createdId(); as cid) {
     <p class="success-banner">
-      Zone <span class="mono">#{{ cid }}</span> was created.
-      <a routerLink="/zones">Dismiss</a>
+      {{ 'common.createdBanner' | t:{ entity: ('zone.entity' | t), id: cid } }}
+      <a routerLink="/zones">{{ 'common.dismiss' | t }}</a>
     </p>
   }
   @if (updatedId(); as uid) {
     <p class="success-banner success-banner--muted">
-      Zone <span class="mono">#{{ uid }}</span> was updated.
-      <a routerLink="/zones">Dismiss</a>
+      {{ 'common.updatedBanner' | t:{ entity: ('zone.entity' | t), id: uid } }}
+      <a routerLink="/zones">{{ 'common.dismiss' | t }}</a>
     </p>
   }
 
   <div class="toolbar">
     <div class="search-field">
-      <label class="label-text" for="zone-search">Search</label>
+      <label class="label-text" for="zone-search">{{ 'common.search' | t }}</label>
       <input
         id="zone-search"
         type="search"
         autocomplete="off"
-        placeholder="Code or name contains…"
+        [placeholder]="'zone.searchPlaceholder' | t"
         [value]="searchTerm()"
         (input)="onSearchInput($any($event.target).value)"
       />
     </div>
     @if (loading()) {
-      <span class="status" aria-live="polite">Loading…</span>
+      <span class="status" aria-live="polite">{{ 'common.loading' | t }}</span>
     }
-    <a routerLink="/zones/new" class="add-link">Add zone</a>
+    <a routerLink="/zones/new" class="add-link">{{ 'zone.addZone' | t }}</a>
   </div>
 
   @if (error(); as err) {
@@ -46,18 +44,18 @@
     <table>
       <thead>
         <tr>
-          <th>ID</th>
-          <th class="col-photo">Thumb</th>
-          <th>Code</th>
-          <th>Name</th>
-          <th>Ver.</th>
-          <th class="col-actions">Actions</th>
+          <th>{{ 'common.id' | t }}</th>
+          <th class="col-photo">{{ 'common.thumb' | t }}</th>
+          <th>{{ 'common.code' | t }}</th>
+          <th>{{ 'common.name' | t }}</th>
+          <th>{{ 'common.version' | t }}</th>
+          <th class="col-actions">{{ 'common.actions' | t }}</th>
         </tr>
       </thead>
       <tbody>
         @if (loading() && zones().length === 0) {
           <tr>
-            <td class="empty" colspan="6">Loading…</td>
+            <td class="empty" colspan="6">{{ 'common.loading' | t }}</td>
           </tr>
         }
         @for (z of zones(); track z.id ?? $index) {
@@ -69,9 +67,9 @@
                   type="button"
                   class="zone-thumb-btn"
                   (click)="openLightbox(z)"
-                  [attr.aria-label]="'View larger photo: ' + (z.name?.trim() || z.code)"
+                  [attr.aria-label]="viewPhotoLabel(z)"
                 >
-                  <span class="zone-thumb-wrap" title="Click to enlarge">
+                  <span class="zone-thumb-wrap" [title]="'common.clickEnlarge' | t">
                     <img
                       [src]="src"
                       alt=""
@@ -83,22 +81,22 @@
                   </span>
                 </button>
               } @else {
-                <span class="zone-thumb-placeholder" title="No photo"></span>
+                <span class="zone-thumb-placeholder" [title]="'common.noPhoto' | t"></span>
               }
             </td>
             <td class="mono">{{ z.code }}</td>
-            <td>{{ z.name?.trim() || '—' }}</td>
+            <td>{{ z.name?.trim() || ('common.emptyDash' | t) }}</td>
             <td class="mono">{{ z.version }}</td>
             <td class="col-actions">
               @if (z.id != null) {
-                <a [routerLink]="['/zones', z.id, 'edit']" class="edit-link">Edit</a>
+                <a [routerLink]="['/zones', z.id, 'edit']" class="edit-link">{{ 'common.edit' | t }}</a>
                 <button
                   type="button"
                   class="delete-btn"
                   [disabled]="deletingId() === z.id"
                   (click)="deleteZone(z)"
                 >
-                  {{ deletingId() === z.id ? 'Deleting…' : 'Delete' }}
+                  {{ deletingId() === z.id ? ('common.deleting' | t) : ('common.delete' | t) }}
                 </button>
               }
             </td>
@@ -106,7 +104,7 @@
         } @empty {
           @if (!loading()) {
             <tr>
-              <td class="empty" colspan="6">No zones found.</td>
+              <td class="empty" colspan="6">{{ 'common.noResults' | t:{ entity: ('zone.title' | t) } }}</td>
             </tr>
           }
         }
@@ -119,11 +117,11 @@
       class="zone-lightbox-overlay"
       role="dialog"
       aria-modal="true"
-      [attr.aria-label]="'Photo: ' + (lz.name?.trim() || lz.code)"
+      [attr.aria-label]="photoDialogLabel(lz)"
       (click)="onLightboxBackdropClick($event)"
     >
       <div class="zone-lightbox-panel" (click)="$event.stopPropagation()">
-        <button type="button" class="zone-lightbox-close" (click)="closeLightbox()" aria-label="Close">×</button>
+        <button type="button" class="zone-lightbox-close" (click)="closeLightbox()" [attr.aria-label]="'common.closePhoto' | t">×</button>
         @if (pictureSrc(lz); as bigSrc) {
           <img [src]="bigSrc" class="zone-lightbox-img" [alt]="lz.name?.trim() || lz.code" />
         }

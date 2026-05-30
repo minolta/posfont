@@ -1,39 +1,36 @@
 <div class="food-category-list-page">
-  <h1>Food categories</h1>
-  <p class="hint">
-    Search matches <span class="mono">code</span> or <span class="mono">name</span> on the server
-    (<code>GET /api/food-categories?q=</code>).
-  </p>
+  <h1>{{ 'foodCategory.title' | t }}</h1>
+  <p class="hint">{{ 'foodCategory.hint' | t }}</p>
 
   @if (createdId(); as cid) {
     <p class="success-banner">
-      Category <span class="mono">#{{ cid }}</span> was created.
-      <a routerLink="/food-categories">Dismiss</a>
+      {{ 'common.createdBanner' | t:{entity: ('foodCategory.entity' | t), id: cid} }}
+      <a routerLink="/food-categories">{{ 'common.dismiss' | t }}</a>
     </p>
   }
   @if (updatedId(); as uid) {
     <p class="success-banner success-banner--muted">
-      Category <span class="mono">#{{ uid }}</span> was updated.
-      <a routerLink="/food-categories">Dismiss</a>
+      {{ 'common.updatedBanner' | t:{entity: ('foodCategory.entity' | t), id: uid} }}
+      <a routerLink="/food-categories">{{ 'common.dismiss' | t }}</a>
     </p>
   }
 
   <div class="toolbar">
     <div class="search-field">
-      <label class="label-text" for="category-list-search">Search</label>
+      <label class="label-text" for="category-list-search">{{ 'common.search' | t }}</label>
       <input
         id="category-list-search"
         type="search"
         autocomplete="off"
-        placeholder="Code or name contains…"
+        [attr.placeholder]="'foodCategory.searchPlaceholder' | t"
         [value]="searchTerm()"
         (input)="onSearchInput($any($event.target).value)"
       />
     </div>
     @if (loading()) {
-      <span class="status" aria-live="polite">Loading…</span>
+      <span class="status" aria-live="polite">{{ 'common.loading' | t }}</span>
     }
-    <a routerLink="/food-categories/new" class="add-link">New category</a>
+    <a routerLink="/food-categories/new" class="add-link">{{ 'foodCategory.newCategory' | t }}</a>
   </div>
 
   @if (error(); as err) {
@@ -47,35 +44,35 @@
     <table>
       <thead>
         <tr>
-          <th>ID</th>
-          <th>Code</th>
-          <th>Name</th>
-          <th>Ver.</th>
-          <th class="col-actions">Actions</th>
+          <th>{{ 'common.id' | t }}</th>
+          <th>{{ 'common.code' | t }}</th>
+          <th>{{ 'common.name' | t }}</th>
+          <th>{{ 'common.version' | t }}</th>
+          <th class="col-actions">{{ 'common.actions' | t }}</th>
         </tr>
       </thead>
       <tbody>
         @if (loading() && categories().length === 0) {
           <tr>
-            <td class="empty" colspan="5">Loading…</td>
+            <td class="empty" colspan="5">{{ 'common.loading' | t }}</td>
           </tr>
         }
         @for (c of categories(); track c.id ?? $index) {
           <tr>
             <td class="mono">{{ c.id }}</td>
             <td class="mono">{{ c.code }}</td>
-            <td>{{ c.name?.trim() || '—' }}</td>
+            <td>{{ c.name?.trim() || ('common.emptyDash' | t) }}</td>
             <td class="mono">{{ c.version }}</td>
             <td class="col-actions">
               @if (c.id != null) {
-                <a [routerLink]="['/food-categories', c.id, 'edit']" class="edit-link">Edit</a>
+                <a [routerLink]="['/food-categories', c.id, 'edit']" class="edit-link">{{ 'common.edit' | t }}</a>
                 <button
                   type="button"
                   class="delete-btn"
                   [disabled]="deletingId() === c.id"
                   (click)="deleteCategory(c)"
                 >
-                  {{ deletingId() === c.id ? 'Deleting…' : 'Delete' }}
+                  {{ deletingId() === c.id ? ('common.deleting' | t) : ('common.delete' | t) }}
                 </button>
               }
             </td>
@@ -83,7 +80,7 @@
         } @empty {
           @if (!loading()) {
             <tr>
-              <td class="empty" colspan="5">No categories found.</td>
+              <td class="empty" colspan="5">{{ 'common.noResults' | t:{entity: ('nav.categories' | t)} }}</td>
             </tr>
           }
         }

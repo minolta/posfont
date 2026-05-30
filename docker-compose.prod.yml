@@ -1,0 +1,12 @@
+# Run a pre-loaded image (no build on server). Use after `docker load`.
+services:
+  web:
+    container_name: posfont-web
+    image: posfont-web:latest
+    restart: always
+    ports:
+      - "${APP_PORT:-888}:80"
+    environment:
+      API_BASE_URL: "${API_BASE_URL:-http://203.150.243.87:8080}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

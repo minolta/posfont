@@ -1,39 +1,43 @@
 <div class="table-list-page">
-  <h1>Tables</h1>
-  <p class="hint">
-    Search matches <span class="mono">code</span> on the server (<code>GET /api/tables?q=</code>). Each table belongs to a
-    <span class="mono">zone</span>.
-  </p>
+  <h1>{{ 'table.title' | t }}</h1>
+  <p class="hint">{{ 'table.hint' | t }}</p>
+
+  @if (newOrderId(); as oid) {
+    <p class="success-banner">
+      {{ 'common.createdBanner' | t:{ entity: ('order.entity' | t), id: oid } }}
+      <a routerLink="/tables">{{ 'common.dismiss' | t }}</a>
+    </p>
+  }
 
   @if (createdId(); as cid) {
     <p class="success-banner">
-      Table <span class="mono">#{{ cid }}</span> was created.
-      <a routerLink="/tables">Dismiss</a>
+      {{ 'common.createdBanner' | t:{ entity: ('table.entity' | t), id: cid } }}
+      <a routerLink="/tables">{{ 'common.dismiss' | t }}</a>
     </p>
   }
   @if (updatedId(); as uid) {
     <p class="success-banner success-banner--muted">
-      Table <span class="mono">#{{ uid }}</span> was updated.
-      <a routerLink="/tables">Dismiss</a>
+      {{ 'common.updatedBanner' | t:{ entity: ('table.entity' | t), id: uid } }}
+      <a routerLink="/tables">{{ 'common.dismiss' | t }}</a>
     </p>
   }
 
   <div class="toolbar">
     <div class="search-field">
-      <label class="label-text" for="table-search">Search</label>
+      <label class="label-text" for="table-search">{{ 'common.search' | t }}</label>
       <input
         id="table-search"
         type="search"
         autocomplete="off"
-        placeholder="Code contains…"
+        [placeholder]="'table.searchPlaceholder' | t"
         [value]="searchTerm()"
         (input)="onSearchInput($any($event.target).value)"
       />
     </div>
     @if (loading()) {
-      <span class="status" aria-live="polite">Loading…</span>
+      <span class="status" aria-live="polite">{{ 'common.loading' | t }}</span>
     }
-    <a routerLink="/tables/new" class="add-link">Add table</a>
+    <a routerLink="/tables/new" class="add-link">{{ 'table.addTable' | t }}</a>
   </div>
 
   @if (error(); as err) {
@@ -50,17 +54,17 @@
     <table>
       <thead>
         <tr>
-          <th>ID</th>
-          <th>Code</th>
-          <th>Zone</th>
-          <th>Ver.</th>
-          <th class="col-actions">Actions</th>
+          <th>{{ 'common.id' | t }}</th>
+          <th>{{ 'common.code' | t }}</th>
+          <th>{{ 'common.zone' | t }}</th>
+          <th>{{ 'common.version' | t }}</th>
+          <th class="col-actions">{{ 'common.actions' | t }}</th>
         </tr>
       </thead>
       <tbody>
         @if (loading() && tables().length === 0) {
           <tr>
-            <td class="empty" colspan="5">Loading…</td>
+            <td class="empty" colspan="5">{{ 'common.loading' | t }}</td>
           </tr>
         }
         @for (t of tables(); track t.id ?? $index) {
@@ -75,33 +79,49 @@
                   type="button"
                   class="new-order-link"
                   [class.pay-link]="hasBlockedOpenOrder(t.id)"
-                  [attr.title]="hasBlockedOpenOrder(t.id) ? 'Pay open order on this table' : 'Create new order'"
+                  [attr.title]="hasBlockedOpenOrder(t.id) ? ('table.payOpenOrder' | t) : ('table.createNewOrder' | t)"
                   (click)="openNewOrder(t)"
                 >
                   @if (hasBlockedOpenOrder(t.id)) {
-                    Pay ({{ payableTotalByTable(t.id) | number: '1.0-2' }})
+                    {{ 'table.pay' | t }} ({{ payableTotalByTable(t.id) | number: '1.0-2' }})
                   } @else {
-                    New order
+                    {{ 'table.newOrder' | t }}
                   }
+                </button>
+                <button
+                  type="button"
+                  class="order-qr-link"
+                  [title]="'table.qrForGuests' | t"
+                  (click)="openOrderEntryQrDialog(t)"
+                >
+                  {{ 'table.orderQr' | t }}
                 </button>
                 @if (hasBlockedOpenOrder(t.id) && t.id != null) {
                   <button
                     type="button"
                     class="new-order-link add-line-link"
-                    title="Add more order lines"
+                    [title]="'table.addMoreLines' | t"
                     (click)="openAddLineForTable(t.id)"
                   >
-                    + Line
+                    {{ 'table.addLine' | t }}
+                  </button>
+                  <button
+                    type="button"
+                    class="new-order-link customer-screen-link-table"
+                    [title]="'table.customerDisplayHint' | t"
+                    (click)="openCustomerDisplayPage(openOrderByTable(t.id)?.id)"
+                  >
+                    {{ 'table.customerScreen' | t }}
                   </button>
                 }
-                <a [routerLink]="['/tables', t.id, 'edit']" class="edit-link">Edit</a>
+                <a [routerLink]="['/tables', t.id, 'edit']" class="edit-link">{{ 'common.edit' | t }}</a>
                 <button
                   type="button"
                   class="delete-btn"
                   [disabled]="deletingId() === t.id"
                   (click)="deleteTable(t)"
                 >
-                  {{ deletingId() === t.id ? 'Deleting…' : 'Delete' }}
+                  {{ deletingId() === t.id ? ('common.deleting' | t) : ('common.delete' | t) }}
                 </button>
               }
             </td>
@@ -109,7 +129,7 @@
         } @empty {
           @if (!loading()) {
             <tr>
-              <td class="empty" colspan="5">No tables found.</td>
+              <td class="empty" colspan="5">{{ 'common.noResults' | t:{ entity: ('table.title' | t) } }}</td>
             </tr>
           }
         }
@@ -120,16 +140,45 @@
   @if (payDialogOrder(); as po) {
     <div class="dialog-backdrop" (click)="closePayDialog()">
       <div class="pay-dialog" (click)="$event.stopPropagation()">
-        <h3>Confirm payment</h3>
+        <h3>{{ 'table.settlePayment' | t }}</h3>
         <p class="pay-order-no">
-          Order: <span class="mono">{{ po.orderNo }}</span>
+          {{ 'common.order' | t }}: <span class="mono">{{ po.orderNo }}</span>
+        </p>
+        <p class="pay-dialog-customer-bar">
+          <button
+            type="button"
+            class="customer-display-btn-table"
+            [disabled]="payingOrderId() === po.id"
+            (click)="openCustomerDisplayPage(po.id)"
+          >
+            {{ 'table.customerScreenNewTab' | t }}
+          </button>
         </p>
         <p class="pay-total">
-          Amount due (excludes canceled lines):
+          {{ 'order.totalToPay' | t }}
           <span class="mono">{{ payableTotal(po) | number: '1.2-2' }}</span>
         </p>
-        <label class="pay-input-label" for="table-pay-input-amount">Amount customer gives</label>
+        <app-promptpay-qr-display [amountBaht]="payableTotal(po)" />
+        <div class="pay-dialog-order-note">
+          <span class="pay-dialog-order-note-label">{{ 'order.orderNote' | t }}</span>
+          @if (payDialogNoteError(); as ne) {
+            <p class="pay-dialog-note-error" role="alert">{{ ne }}</p>
+          }
+          <textarea
+            id="table-pay-dialog-order-note-input"
+            class="pay-dialog-order-note-input"
+            rows="2"
+            maxlength="2000"
+            spellcheck="false"
+            autocomplete="off"
+            [readonly]="payingOrderId() === po.id"
+            [ngModel]="payDialogNoteDraft()"
+            (ngModelChange)="payDialogNoteDraft.set($event)"
+          ></textarea>
+        </div>
+        <label class="pay-input-label" for="table-pay-input-amount">{{ 'order.inputTotal' | t }}</label>
         <input
+          #payAmountInput
           id="table-pay-input-amount"
           type="number"
           min="0"
@@ -141,10 +190,13 @@
           (click)="$any($event.target).select()"
           (input)="setPayInputAmount($any($event.target).value)"
         />
-        <p class="pay-change-line">
-          Change to return:
-          <span class="mono">{{ payDialogChangePreview() | number: '1.2-2' }}</span>
-        </p>
+        @let change = payDialogChange(po);
+        @if (change > 0) {
+          <p class="pay-change">
+            {{ 'common.change' | t }}: <span class="mono">{{ change | number: '1.2-2' }}</span>
+          </p>
+          <p class="pay-qr-gate">{{ 'order.qrCreditBlocked' | t }}</p>
+        }
         <div class="pay-actions">
           <button
             type="button"
@@ -152,9 +204,68 @@
             [disabled]="payingOrderId() === po.id || +payInputAmount() < 0 || payInputAmount().trim() === ''"
             (click)="confirmPayFromDialog()"
           >
-            {{ payingOrderId() === po.id ? 'Paying…' : 'Confirm pay' }}
+            {{ payingOrderId() === po.id ? ('order.paying' | t) : ('order.paidByCash' | t) }}
           </button>
-          <button type="button" class="edit-link pay-close-btn" (click)="closePayDialog()">Close</button>
+          <button
+            type="button"
+            class="new-order-link pay-link pay-link-qr"
+            [title]="'order.exactTotalQr' | t"
+            [disabled]="payQrSettlementDisabled(po)"
+            (click)="confirmPayQrFromDialog()"
+          >
+            {{ payingOrderId() === po.id ? ('order.paying' | t) : ('order.paidByQr' | t) }}
+          </button>
+          <button
+            type="button"
+            class="new-order-link pay-link pay-link-credit"
+            [title]="'order.exactTotalCredit' | t"
+            [disabled]="payQrSettlementDisabled(po)"
+            (click)="confirmPayCreditFromDialog()"
+          >
+            {{ payingOrderId() === po.id ? ('order.paying' | t) : ('order.credit' | t) }}
+          </button>
+          <button type="button" class="edit-link pay-close-btn" (click)="closePayDialog()">{{ 'common.close' | t }}</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (orderEntryQrTableId() != null) {
+    <div class="dialog-backdrop" (click)="closeOrderEntryQrDialog()">
+      <div class="order-qr-dialog" (click)="$event.stopPropagation()" role="dialog" aria-labelledby="order-qr-title">
+        <h3 id="order-qr-title">{{ 'table.scanToOrder' | t }}</h3>
+        <p class="order-qr-hint">{{ 'table.qrDialogHint' | t }}</p>
+        <div class="order-qr-panel">
+          @if (orderEntryQrTableLabel(); as tbl) {
+            <p class="order-qr-table-caption">{{ tbl }}</p>
+          }
+          @if (orderEntryQrError(); as qerr) {
+            <p class="error order-qr-panel-error" role="alert">{{ qerr }}</p>
+          } @else if (orderEntryQrDataUrl(); as qrSrc) {
+            <img
+              class="order-qr-img"
+              [src]="qrSrc"
+              width="220"
+              height="220"
+              [attr.alt]="orderQrAltLabel()"
+            />
+          } @else {
+            <p class="order-qr-loading" aria-live="polite">{{ 'table.generatingQr' | t }}</p>
+          }
+        </div>
+        <p class="order-qr-url mono">{{ orderEntryQrUrl() }}</p>
+        <div class="order-qr-actions">
+          <a
+            class="new-order-link"
+            [href]="orderEntryQrUrl()"
+            target="_blank"
+            rel="noopener noreferrer"
+            >{{ 'table.openLink' | t }}</a
+          >
+          <button type="button" class="edit-link order-qr-copy-btn" (click)="copyOrderEntryLink()">
+            {{ 'table.copyLink' | t }}
+          </button>
+          <button type="button" class="edit-link pay-close-btn" (click)="closeOrderEntryQrDialog()">{{ 'common.close' | t }}</button>
         </div>
       </div>
     </div>

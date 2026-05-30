@@ -1,38 +1,36 @@
 <div class="food-list-page">
-  <h1>Foods</h1>
-  <p class="hint">
-    Search matches <span class="mono">code</span> or <span class="mono">name</span> on the server (<code>GET /api/foods?q=</code>).
-  </p>
+  <h1>{{ 'food.title' | t }}</h1>
+  <p class="hint">{{ 'food.hint' | t }}</p>
 
   @if (createdId(); as cid) {
     <p class="success-banner">
-      Food <span class="mono">#{{ cid }}</span> was created.
-      <a routerLink="/foods">Dismiss</a>
+      {{ 'common.createdBanner' | t:{entity: ('food.entity' | t), id: cid} }}
+      <a routerLink="/foods">{{ 'common.dismiss' | t }}</a>
     </p>
   }
   @if (updatedId(); as uid) {
     <p class="success-banner success-banner--muted">
-      Food <span class="mono">#{{ uid }}</span> was updated.
-      <a routerLink="/foods">Dismiss</a>
+      {{ 'common.updatedBanner' | t:{entity: ('food.entity' | t), id: uid} }}
+      <a routerLink="/foods">{{ 'common.dismiss' | t }}</a>
     </p>
   }
 
   <div class="toolbar">
     <div class="search-field">
-      <label class="label-text" for="food-search">Search</label>
+      <label class="label-text" for="food-search">{{ 'common.search' | t }}</label>
       <input
         id="food-search"
         type="search"
         autocomplete="off"
-        placeholder="Code or name contains…"
+        [attr.placeholder]="'food.searchPlaceholder' | t"
         [value]="searchTerm()"
         (input)="onSearchInput($any($event.target).value)"
       />
     </div>
     @if (loading()) {
-      <span class="status" aria-live="polite">Loading…</span>
+      <span class="status" aria-live="polite">{{ 'common.loading' | t }}</span>
     }
-    <a routerLink="/foods/new" class="add-link">Add food</a>
+    <a routerLink="/foods/new" class="add-link">{{ 'food.addFood' | t }}</a>
   </div>
 
   @if (error(); as err) {
@@ -42,8 +40,12 @@
     <p class="error" role="alert">{{ delErr }}</p>
   }
 
-  <div class="category-filter" role="group" aria-label="Filter by category">
-    <span class="category-filter-label">Category</span>
+  @if (blockToggleError(); as be) {
+    <p class="error" role="alert">{{ be }}</p>
+  }
+
+  <div class="category-filter" role="group" [attr.aria-label]="'food.filterCategory' | t">
+    <span class="category-filter-label">{{ 'common.category' | t }}</span>
     <div class="category-chips">
       <button
         type="button"
@@ -51,7 +53,7 @@
         [class.category-chip--active]="selectedCategoryId() === null"
         (click)="selectCategoryFilter(null)"
       >
-        All
+        {{ 'common.all' | t }}
       </button>
       @for (cat of allCategories(); track cat.id ?? cat.code + $index) {
         @if (cat.id != null) {
@@ -73,21 +75,22 @@
     <table>
       <thead>
         <tr>
-          <th>ID</th>
-          <th class="col-photo">Thumb</th>
-          <th>Code</th>
-          <th>Name</th>
-          <th>Base price</th>
-          <th>Kitchen</th>
-          <th>Category</th>
-          <th>Ver.</th>
-          <th class="col-actions">Actions</th>
+          <th>{{ 'common.id' | t }}</th>
+          <th class="col-photo">{{ 'common.thumb' | t }}</th>
+          <th>{{ 'common.code' | t }}</th>
+          <th>{{ 'common.name' | t }}</th>
+          <th>{{ 'common.basePrice' | t }}</th>
+          <th>{{ 'common.kitchen' | t }}</th>
+          <th>{{ 'common.category' | t }}</th>
+          <th class="col-no-order" [attr.title]="'food.doNotAllowOrder' | t">{{ 'food.noOrderLines' | t }}</th>
+          <th>{{ 'common.version' | t }}</th>
+          <th class="col-actions">{{ 'common.actions' | t }}</th>
         </tr>
       </thead>
       <tbody>
         @if (loading() && foods().length === 0) {
           <tr>
-            <td class="empty" colspan="9">Loading…</td>
+            <td class="empty" colspan="10">{{ 'common.loading' | t }}</td>
           </tr>
         }
         @for (food of displayedFoods(); track food.id ?? $index) {
@@ -99,9 +102,11 @@
                   type="button"
                   class="food-thumb-btn"
                   (click)="openLightbox(food)"
-                  [attr.aria-label]="'View larger photo: ' + (food.name?.trim() || food.code)"
+                  [attr.aria-label]="
+                    ('common.viewPhoto' | t:{name: food.name?.trim() || food.code})
+                  "
                 >
-                  <span class="food-thumb-wrap" title="Click to enlarge">
+                  <span class="food-thumb-wrap" [attr.title]="'common.clickEnlarge' | t">
                     <img
                       [src]="src"
                       alt=""
@@ -113,25 +118,43 @@
                   </span>
                 </button>
               } @else {
-                <span class="food-thumb-placeholder" title="No photo"></span>
+                <span class="food-thumb-placeholder" [attr.title]="'common.noPhoto' | t"></span>
               }
             </td>
             <td class="mono">{{ food.code }}</td>
-            <td>{{ food.name?.trim() || '—' }}</td>
+            <td>{{ food.name?.trim() || ('common.emptyDash' | t) }}</td>
             <td>{{ food.basePrice | number: '1.2-2' }}</td>
             <td>{{ kitchenCell(food.kitchen) }}</td>
             <td>{{ categoryCell(food.foodCategory) }}</td>
+            <td class="col-no-order-cell">
+              @if (food.id != null) {
+                <label class="chk-no-order">
+                  <input
+                    type="checkbox"
+                    [checked]="foodBlocksOrderLines(food)"
+                    [disabled]="blockRowSavingId() === food.id || deletingId() === food.id"
+                    (change)="setBlockOrderLine(food, $any($event.target).checked)"
+                    [attr.aria-label]="
+                      ('food.cannotAddOrders' | t:{name: food.name?.trim() || food.code})
+                    "
+                  />
+                  <span class="sr-only">{{ 'food.blockOrderLines' | t }}</span>
+                </label>
+              } @else {
+                {{ 'common.emptyDash' | t }}
+              }
+            </td>
             <td class="mono">{{ food.version }}</td>
             <td class="col-actions">
               @if (food.id != null) {
-                <a [routerLink]="['/foods', food.id, 'edit']" class="edit-link">Edit</a>
+                <a [routerLink]="['/foods', food.id, 'edit']" class="edit-link">{{ 'common.edit' | t }}</a>
                 <button
                   type="button"
                   class="delete-btn"
                   [disabled]="deletingId() === food.id"
                   (click)="deleteFood(food)"
                 >
-                  {{ deletingId() === food.id ? 'Deleting…' : 'Delete' }}
+                  {{ deletingId() === food.id ? ('common.deleting' | t) : ('common.delete' | t) }}
                 </button>
               }
             </td>
@@ -139,11 +162,11 @@
         } @empty {
           @if (!loading()) {
             <tr>
-              <td class="empty" colspan="9">
+              <td class="empty" colspan="10">
                 @if (foods().length > 0) {
-                  No foods in this category for the current search.
+                  {{ 'food.noFoodsCategory' | t }}
                 } @else {
-                  No foods found.
+                  {{ 'common.noResults' | t:{entity: ('nav.foods' | t)} }}
                 }
               </td>
             </tr>
@@ -158,11 +181,11 @@
       class="food-lightbox-overlay"
       role="dialog"
       aria-modal="true"
-      [attr.aria-label]="'Photo: ' + (lf.name?.trim() || lf.code)"
+      [attr.aria-label]="('common.photoOf' | t:{name: lf.name?.trim() || lf.code})"
       (click)="onLightboxBackdropClick($event)"
     >
       <div class="food-lightbox-panel" (click)="$event.stopPropagation()">
-        <button type="button" class="food-lightbox-close" (click)="closeLightbox()" aria-label="Close">
+        <button type="button" class="food-lightbox-close" (click)="closeLightbox()" [attr.aria-label]="'common.closePhoto' | t">
           ×
         </button>
         @if (pictureSrc(lf); as bigSrc) {

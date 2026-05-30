@@ -1,0 +1,55 @@
+:host {
+  display: block;
+}
+
+/* Side column on customer display: no extra top rule (parent draws the divider). */
+:host-context(.customer-body-qr) .promptpay-wrap {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.promptpay-wrap {
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid #e5e7eb;
+  text-align: center;
+}
+
+.promptpay-heading {
+  margin: 0 0 0.5rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #0f766e;
+}
+
+.promptpay-img {
+  display: block;
+  margin: 0 auto;
+  border-radius: 10px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+}
+
+.promptpay-amount {
+  margin: 0.5rem 0 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.thb-suffix {
+  margin-left: 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.hint {
+  margin: 0.45rem 0 0;
+  font-size: 0.74rem;
+  line-height: 1.35;
+  color: #6b7280;
+}

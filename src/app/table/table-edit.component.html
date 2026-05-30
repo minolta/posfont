@@ -1,13 +1,10 @@
 <div class="page">
-  <a routerLink="/tables" class="back">← Back to tables</a>
-  <h1>Edit table</h1>
-  <p class="hint">
-    Updates via <code>PUT /api/tables/&#123;id&#125;</code> with <span class="mono">code</span>, <span class="mono">basePrice</span>,
-    <span class="mono">zoneId</span>, and <span class="mono">version</span> (optimistic lock).
-  </p>
+  <a routerLink="/tables" class="back">{{ 'common.backTo' | t:{ target: ('table.backTables' | t) } }}</a>
+  <h1>{{ 'table.editTitle' | t }}</h1>
+  <p class="hint">{{ 'table.editHint' | t }}</p>
 
   @if (loading()) {
-    <p class="status">Loading…</p>
+    <p class="status">{{ 'common.loading' | t }}</p>
   } @else if (loadError(); as le) {
     <p class="error-banner" role="alert">{{ le }}</p>
   } @else {
@@ -17,7 +14,7 @@
 
     <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
       <div class="field" [class.invalid]="form.controls.code.invalid && form.controls.code.touched">
-        <label for="table-edit-code">Code</label>
+        <label for="table-edit-code">{{ 'common.code' | t }}</label>
         <input
           id="table-edit-code"
           type="text"
@@ -28,12 +25,12 @@
           [readonly]="submitting()"
         />
         @if (form.controls.code.invalid && form.controls.code.touched) {
-          <span class="err">Enter a valid code.</span>
+          <span class="err">{{ 'common.validCode' | t }}</span>
         }
       </div>
 
       <div class="field" [class.invalid]="form.controls.basePrice.invalid && form.controls.basePrice.touched">
-        <label for="table-edit-basePrice">Base price</label>
+        <label for="table-edit-basePrice">{{ 'common.basePrice' | t }}</label>
         <input
           id="table-edit-basePrice"
           type="number"
@@ -43,28 +40,28 @@
           [readonly]="submitting()"
         />
         @if (form.controls.basePrice.invalid && form.controls.basePrice.touched) {
-          <span class="err">Enter a price ≥ 0.</span>
+          <span class="err">{{ 'common.priceMinZero' | t }}</span>
         }
       </div>
 
       <div class="field" [class.invalid]="form.controls.zoneId.invalid && form.controls.zoneId.touched">
-        <label for="zone-select">Zone</label>
+        <label for="zone-select">{{ 'common.zone' | t }}</label>
         @if (zones().length > 0) {
           <div class="pick-with-search">
-            <label class="label-text" for="zone-search">Find zone</label>
+            <label class="label-text" for="zone-search">{{ 'table.findZone' | t }}</label>
             <input
               id="zone-search"
               type="search"
               autocomplete="off"
-              placeholder="Name, code, or id…"
+              [placeholder]="'table.zonePlaceholder' | t"
               [value]="zoneSearch()"
               (input)="zoneSearch.set($any($event.target).value)"
             />
             @if (filterZones(zones()).length === 0) {
-              <p class="filter-empty">No zones match — clear search to see all.</p>
+              <p class="filter-empty">{{ 'common.noMatchSearch' | t:{ entity: ('zone.title' | t) } }}</p>
             }
-            <select id="zone-select" formControlName="zoneId" aria-label="Zone, value is id">
-              <option value="" disabled>Choose zone…</option>
+            <select id="zone-select" formControlName="zoneId" [attr.aria-label]="'common.zone' | t">
+              <option value="" disabled>{{ 'common.choose' | t:{ entity: ('common.zone' | t) } }}</option>
               @for (z of filterZones(zones()); track z.id) {
                 <option [value]="z.id">{{ zoneOptionLabel(z) }}</option>
               }
@@ -77,27 +74,27 @@
             formControlName="manualZoneId"
             min="1"
             step="1"
-            placeholder="Zone id"
+            [placeholder]="'table.zoneId' | t"
             [readonly]="submitting()"
           />
-          <p class="hint-inline">No zones in list — enter zone id.</p>
+          <p class="hint-inline">{{ 'table.noZonesList' | t }}</p>
         }
         @if (form.controls.zoneId.invalid && form.controls.zoneId.touched) {
-          <span class="err">Choose a zone.</span>
+          <span class="err">{{ 'table.chooseZone' | t }}</span>
         }
       </div>
 
       <div class="field" [class.invalid]="form.controls.version.invalid && form.controls.version.touched">
-        <label for="table-edit-version">Version</label>
+        <label for="table-edit-version">{{ 'common.version' | t }}</label>
         <input id="table-edit-version" type="number" formControlName="version" min="0" step="1" [readonly]="submitting()" />
         @if (form.controls.version.invalid && form.controls.version.touched) {
-          <span class="err">Version must be a non‑negative integer from the server.</span>
+          <span class="err">{{ 'common.versionNonNegative' | t }}</span>
         }
       </div>
 
       <div class="actions">
         <button type="submit" [disabled]="submitting() || !canSubmitForm()">
-          {{ submitting() ? 'Saving…' : 'Save changes' }}
+          {{ submitting() ? ('common.saving' | t) : ('common.saveChanges' | t) }}
         </button>
       </div>
     </form>

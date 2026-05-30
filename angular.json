@@ -31,6 +31,12 @@
           },
           "configurations": {
             "production": {
+              "fileReplacements": [
+                {
+                  "replace": "src/app/api/pos-api-base-url.value.ts",
+                  "with": "src/app/api/pos-api-base-url.value.prod.ts"
+                }
+              ],
               "budgets": [
                 {
                   "type": "initial",
@@ -39,8 +45,8 @@
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "4kB",
-                  "maximumError": "8kB"
+                  "maximumWarning": "5kB",
+                  "maximumError": "12kB"
                 }
               ],
               "outputHashing": "all"

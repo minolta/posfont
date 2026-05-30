@@ -1,0 +1,264 @@
+:host {
+  display: block;
+  min-height: 100vh;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  color: #0f172a;
+}
+
+.customer-shell {
+  max-width: 56rem;
+  margin: 0 auto;
+  padding: 1.5rem 1.1rem 2.5rem;
+}
+
+.customer-lang-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.75rem;
+}
+
+.waiting-card {
+  text-align: center;
+  padding: 2rem 1rem;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+}
+
+.waiting-card .customer-title {
+  margin-bottom: 0.75rem;
+}
+
+.status {
+  font-size: 1.25rem;
+  text-align: center;
+  color: #475569;
+  margin: 2rem 0;
+}
+
+.customer-head {
+  text-align: center;
+  margin-bottom: 1.25rem;
+}
+
+.customer-title {
+  margin: 0 0 0.35rem;
+  font-size: clamp(1.75rem, 5vw, 2.35rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.order-no {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.meta {
+  margin: 0.35rem 0 0;
+  font-size: 0.98rem;
+  color: #64748b;
+}
+
+.order-note-banner {
+  margin: 0 auto 1.25rem;
+  max-width: 36rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.75rem;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+  font-size: 1.02rem;
+  line-height: 1.45;
+  text-align: center;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.mono {
+  font-variant-numeric: tabular-nums;
+}
+
+.banner {
+  border-radius: 12px;
+  padding: 0.95rem 1rem;
+  margin: 0 0 1.25rem;
+  text-align: center;
+  font-size: 1.05rem;
+}
+
+.banner-cancel {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+}
+
+.banner-paid {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+}
+
+.paid-msg {
+  margin: 0 0 0.35rem;
+  font-size: 1.2rem;
+}
+
+.paid-detail {
+  margin: 0.15rem 0 0;
+  font-size: 0.95rem;
+}
+
+.customer-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.customer-body-primary {
+  min-width: 0;
+}
+
+.customer-body--with-qr {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1.25rem 2rem;
+  align-items: start;
+}
+
+.customer-body-qr {
+  position: sticky;
+  top: 1rem;
+  padding: 0.75rem 0 0 1.5rem;
+  border-left: 1px solid #e2e8f0;
+  min-width: 0;
+}
+
+@media (max-width: 42rem) {
+  .customer-body--with-qr {
+    grid-template-columns: 1fr;
+  }
+
+  .customer-body-qr {
+    padding: 1rem 0 0;
+    border-left: none;
+    border-top: 1px solid #e2e8f0;
+    justify-self: center;
+  }
+}
+
+.section-title {
+  margin: 0 0 0.65rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+}
+
+.line-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.line-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.65rem;
+  align-items: baseline;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 1.05rem;
+}
+
+.line-item:last-child {
+  border-bottom: none;
+}
+
+.qty {
+  font-weight: 700;
+  color: #475569;
+}
+
+.name {
+  line-height: 1.35;
+}
+
+.line-total {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.empty {
+  padding: 1.25rem 1rem;
+  text-align: center;
+  color: #64748b;
+}
+
+.total-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 1.25rem 0 0;
+  padding: 1rem 0.25rem 0;
+  border-top: 2px solid #cbd5e1;
+}
+
+.total-label {
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.total-val {
+  font-size: 1.65rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.hint-foot {
+  margin: 1rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: #475569;
+  text-align: center;
+}
+
+.hint-foot.muted {
+  color: #64748b;
+}
+
+.btn-soft {
+  display: block;
+  width: 100%;
+  max-width: 16rem;
+  margin: 1rem auto 0;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #334155;
+  cursor: pointer;
+}
+
+.btn-soft:hover {
+  background: #f8fafc;
+}
+
+.error-banner {
+  margin: 2rem 0 1rem;
+  padding: 0.85rem;
+  border-radius: 10px;
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+  text-align: center;
+}

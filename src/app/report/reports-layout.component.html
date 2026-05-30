@@ -1,0 +1,7 @@
+<div class="reports-shell">
+  <nav class="report-subnav" [attr.aria-label]="'report.section' | t">
+    <a routerLink="daily" routerLinkActive="active">{{ 'report.daily' | t }}</a>
+    <a routerLink="backup" routerLinkActive="active">{{ 'report.backup' | t }}</a>
+  </nav>
+  <router-outlet />
+</div>

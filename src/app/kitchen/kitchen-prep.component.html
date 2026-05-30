@@ -1,0 +1,94 @@
+<div class="prep-page">
+  <a routerLink="/kitchens" class="back">{{ 'kitchen.prepBack' | t }}</a>
+  <h1>{{ 'kitchen.prepTitle' | t }}</h1>
+  <p class="hint">{{ 'kitchen.prepHint' | t:{ seconds: autoRefreshSeconds } }}</p>
+
+  <div class="toolbar">
+    <label class="field">
+      <span class="label-text">{{ 'common.kitchen' | t }}</span>
+      <select
+        class="select"
+        [value]="selectedKitchenId()"
+        [disabled]="loadingKitchens()"
+        (change)="onKitchenSelect($any($event.target).value)"
+      >
+        <option value="">{{ 'kitchen.allKitchens' | t }}</option>
+        @for (k of kitchens(); track k.id) {
+          @if (k.id != null) {
+            <option [value]="k.id!">{{ kitchenOptionLabel(k) }}</option>
+          }
+        }
+      </select>
+    </label>
+    <button type="button" class="btn-refresh" [disabled]="loadingOrders()" (click)="refresh()">
+      {{ loadingOrders() ? ('common.loading' | t) : ('common.refresh' | t) }}
+    </button>
+  </div>
+
+  @if (loadError(); as le) {
+    <p class="error-banner" role="alert">{{ le }}</p>
+  }
+  @if (prepUpdateError(); as ue) {
+    <p class="error-banner prep-action-error" role="alert">{{ ue }}</p>
+  }
+
+  @if (loadingOrders() && prepRows().length === 0 && !loadError()) {
+    <p class="status">{{ 'kitchen.loadingOrders' | t }}</p>
+  }
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>{{ 'common.kitchen' | t }}</th>
+          <th>{{ 'common.order' | t }}</th>
+          <th>{{ 'common.table' | t }}</th>
+          <th>{{ 'common.when' | t }}</th>
+          <th>{{ 'common.item' | t }}</th>
+          <th>{{ 'common.qty' | t }}</th>
+          <th>{{ 'common.note' | t }}</th>
+          <th>{{ 'common.actions' | t }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of prepRows(); track trackRow($index, row)) {
+          <tr>
+            <td class="mono">{{ row.lineId != null ? row.lineId : ('common.emptyDash' | t) }}</td>
+            <td class="mono kitchen-cell">{{ row.kitchenLabel }}</td>
+            <td class="mono">
+              <a [routerLink]="['/orders', row.orderId, 'edit']" class="order-link">{{ row.orderNo }}</a>
+            </td>
+            <td class="mono">
+              {{ row.tableCode }}
+              @if (row.zoneHint) {
+                <span class="muted"> · {{ row.zoneHint }}</span>
+              }
+            </td>
+            <td>{{ row.orderDate | date: 'short' }}</td>
+            <td>{{ row.foodName }}</td>
+            <td class="mono">{{ row.quantity }}</td>
+            <td class="note">{{ row.note ?? ('common.emptyDash' | t) }}</td>
+            <td class="prep-action-cell">
+              <button
+                type="button"
+                class="btn-finish-cook"
+                [title]="'kitchen.finishCookingTitle' | t"
+                [disabled]="isRowFinishUpdating(row.orderId, row.lineIndex)"
+                (click)="finishCooking(row)"
+              >
+                {{ isRowFinishUpdating(row.orderId, row.lineIndex) ? ('common.processing' | t) : ('kitchen.finishCooking' | t) }}
+              </button>
+            </td>
+          </tr>
+        } @empty {
+          @if (!loadingOrders()) {
+            <tr>
+              <td colspan="9" class="empty">{{ 'kitchen.noWaitingLines' | t }}</td>
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+  </div>
+</div>

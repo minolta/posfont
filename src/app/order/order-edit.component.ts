@@ -6,14 +6,23 @@ import {
   FormArray,
   FormBuilder,
   FormGroup,
+  FormsModule,
   ReactiveFormsModule,
   Validators,
 } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { EMPTY, catchError, finalize, forkJoin, map, of, switchMap } from 'rxjs';
+import {
+  EMPTY,
+  catchError,
+  finalize,
+  forkJoin,
+  map,
+  of,
+  switchMap,
+  throwError,
+} from 'rxjs';
 
-import { PosCurrentUserService } from '../auth/pos-current-user.service';
-import type { Food } from '../food/food.model';
+import { foodBlocksOrderLines, type Food } from '../food/food.model';
 import { FoodService } from '../food/food.service';
 import type { PosTable } from '../table/table.model';
 import { TableService } from '../table/table.service';
@@ -23,30 +32,23 @@ import {
   normalizeLocalDateTimeForApi,
 } from './order-datetime.util';
 import { mergeFoodsFromApis, mergeTablesFromApis, foodPickerLabel, tablePickerLabel } from './order-merge.util';
+import type { OrderLine, OrderLineStatus, OrderRequest, PatchOrderNoteRequest, PosOrder } from './order.model';
+import { lineKitchenNote, trimNewLineNote } from './order-line-note.util';
 import { resolvedLineStatus } from './order-line-status.util';
+import { LocaleService } from '../i18n/locale.service';
+import { TranslatePipe } from '../i18n/translate.pipe';
 import {
-  lineFoodId,
-  lineUnitPrice,
-  lineUserId,
-  newOrderLineRequest,
-  orderComplated,
-  orderComplatedDate,
-  orderIsPaid,
-  orderOrderDate,
-  orderOrderNo,
-  orderPaidAt,
-  orderUserFields,
-  orderUserId,
-  type OrderLine,
-  type OrderRequest,
-  type PosOrder,
-} from './order.model';
+  mergeOrderRequestPaymentFromPosOrder,
+  readPosOrderChange,
+  readPosOrderNote,
+  readPosOrderPaidPrice,
+} from './order-pay.util';
 import { OrderService } from './order.service';
 
 @Component({
   selector: 'app-order-edit',
   standalone: true,
-  imports: [DecimalPipe, ReactiveFormsModule, RouterLink],
+  imports: [DecimalPipe, FormsModule, ReactiveFormsModule, RouterLink, TranslatePipe],
   templateUrl: './order-edit.component.html',
   styleUrl: './order-edit.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -58,7 +60,7 @@ export class OrderEditComponent {
   private readonly orderService = inject(OrderService);
   private readonly tableService = inject(TableService);
   private readonly foodService = inject(FoodService);
-  private readonly currentUser = inject(PosCurrentUserService);
+  private readonly i18n = inject(LocaleService);
 
   readonly loading = signal(true);
   readonly loadError = signal<string | null>(null);
@@ -68,6 +70,11 @@ export class OrderEditComponent {
   readonly orderId = signal<number | null>(null);
   readonly orderPaid = signal(false);
   readonly paidView = signal<PosOrder | null>(null);
+  /** Draft for whole-order note on paid orders (PATCH /note). */
+  readonly paidNoteDraft = signal('');
+  readonly paidNoteSaving = signal(false);
+  readonly paidNoteError = signal<string | null>(null);
+  /** Snapshot from GET; used to re-send `paidPrice` / `change` on PUT when present. */
   private readonly loadedOrder = signal<PosOrder | null>(null);
   readonly tableSearch = signal('');
   readonly foodSearch = signal('');
@@ -84,6 +91,7 @@ export class OrderEditComponent {
     complateOrderDate: [''],
     cancel: [false],
     version: [0, [Validators.required, Validators.min(0)]],
+    orderNote: ['', [Validators.maxLength(2000)]],
     lines: this.fb.array([this.newLineGroup()]),
   });
 
@@ -91,13 +99,12 @@ export class OrderEditComponent {
     return this.form.get('lines') as FormArray<FormGroup>;
   }
 
-  newLineGroup(lineUserIdValue?: number | null): FormGroup {
-    const uid = lineUserIdValue ?? this.currentUser.userId();
+  newLineGroup(): FormGroup {
     return this.fb.group({
       foodId: [''],
       manualFoodId: [''],
       quantity: [1, [Validators.required, Validators.min(1)]],
-      userId: [uid != null && uid > 0 ? String(uid) : ''],
+      note: ['', [Validators.maxLength(500)]],
     });
   }
 
@@ -122,10 +129,13 @@ export class OrderEditComponent {
         switchMap((id) => {
           if (!Number.isFinite(id) || id < 1) {
             this.loading.set(false);
-            this.loadError.set('Invalid order id.');
+            this.loadError.set(this.i18n.translate('common.invalidId', { entity: this.i18n.translate('order.entity') }));
             this.orderId.set(null);
             this.orderPaid.set(false);
             this.paidView.set(null);
+            this.loadedOrder.set(null);
+            this.paidNoteDraft.set('');
+            this.paidNoteError.set(null);
             return EMPTY;
           }
           this.orderId.set(id);
@@ -136,7 +146,9 @@ export class OrderEditComponent {
           return forkJoin({
             order: this.orderService.getOrderById(id).pipe(
               catchError(() => {
-                this.loadError.set('Could not load order.');
+                this.loadError.set(
+                  this.i18n.translate('common.couldNotLoad', { entity: this.i18n.translate('order.entity') }),
+                );
                 return of(undefined as PosOrder | undefined);
               }),
             ),
@@ -159,35 +171,39 @@ export class OrderEditComponent {
         this.foods.set(foods);
         if (!order) {
           if (!this.loadError()) {
-            this.loadError.set('Order not found.');
+            this.loadError.set(this.i18n.translate('common.notFound', { entity: this.i18n.translate('order.entity') }));
           }
           this.orderPaid.set(false);
           this.paidView.set(null);
+          this.loadedOrder.set(null);
+          this.paidNoteDraft.set('');
+          this.paidNoteError.set(null);
           return;
         }
         this.loadError.set(null);
-        if (orderIsPaid(order)) {
+        this.loadedOrder.set(order);
+        if (order.paid) {
           this.orderPaid.set(true);
           this.paidView.set(order);
+          this.paidNoteDraft.set(readPosOrderNote(order) ?? '');
+          this.paidNoteError.set(null);
           return;
         }
         this.orderPaid.set(false);
         this.paidView.set(null);
-        this.loadedOrder.set(order);
+        this.paidNoteDraft.set('');
+        this.paidNoteError.set(null);
         while (this.lines.length > 0) {
           this.lines.removeAt(0);
         }
         for (const ln of order.lines ?? []) {
-          const fid = lineFoodId(ln);
+          const fid = ln.food?.id;
           this.lines.push(
             this.fb.group({
               foodId: [fid != null ? String(fid) : ''],
               manualFoodId: [fid != null ? String(fid) : ''],
               quantity: [ln.quantity ?? 1, [Validators.required, Validators.min(1)]],
-              userId: [(() => {
-                const uid = lineUserId(ln);
-                return uid != null ? String(uid) : '';
-              })()],
+              note: [lineKitchenNote(ln) ?? '', [Validators.maxLength(500)]],
             }),
           );
         }
@@ -196,30 +212,31 @@ export class OrderEditComponent {
         }
         const tid = order.table?.id;
         this.form.patchValue({
-          orderNo: orderOrderNo(order),
+          orderNo: order.orderNo,
           tableId: tid != null ? String(tid) : '',
           manualTableId: tid != null ? String(tid) : '',
-          orderDate: isoToDatetimeLocal(orderOrderDate(order)) || defaultDatetimeLocal(),
-          complateOrder: orderComplated(order),
-          complateOrderDate: orderComplatedDate(order)
-            ? isoToDatetimeLocal(orderComplatedDate(order))
+          orderDate: isoToDatetimeLocal(order.orderDate) || defaultDatetimeLocal(),
+          complateOrder: order.complateOrder,
+          complateOrderDate: order.complateOrderDate
+            ? isoToDatetimeLocal(order.complateOrderDate)
             : '',
           cancel: order.cancel,
           version: order.version,
+          orderNote: readPosOrderNote(order) ?? '',
         });
       });
   }
 
   tableCell(t: PosTable | null | undefined): string {
     if (!t) {
-      return '—';
+      return this.i18n.translate('common.emptyDash');
     }
     return tablePickerLabel(t);
   }
 
   foodLabel(f: Food | null | undefined): string {
     if (!f) {
-      return '—';
+      return this.i18n.translate('common.emptyDash');
     }
     return foodPickerLabel(f);
   }
@@ -227,17 +244,19 @@ export class OrderEditComponent {
   linesSummary(o: PosOrder): string {
     const lines = o.lines ?? [];
     if (lines.length === 0) {
-      return '—';
+      return this.i18n.translate('common.emptyDash');
     }
     return lines
       .map((ln) => {
         const label = this.foodLabel(ln.food);
-        return `${ln.quantity}× ${label} @ ${lineUnitPrice(ln)}`;
+        const note = lineKitchenNote(ln);
+        const notePart = note ? ` — “${note}”` : '';
+        return `${ln.quantity}× ${label} @ ${ln.unitPrice}${notePart}`;
       })
       .join('; ');
   }
 
-  lineStatus(line: OrderLine, order: PosOrder): 'WAIT' | 'COMPLETE' | 'CANCEL' {
+  lineStatus(line: OrderLine, order: PosOrder): OrderLineStatus {
     return resolvedLineStatus(line, order);
   }
 
@@ -246,64 +265,45 @@ export class OrderEditComponent {
       if (this.lineStatus(ln, o) === 'CANCEL') {
         return sum;
       }
-      return sum + ln.quantity * lineUnitPrice(ln);
+      return sum + ln.quantity * ln.unitPrice;
     }, 0);
   }
 
-  private numericOrNull(v: number | string | null | undefined): number | null {
-    if (v == null) {
+  paidAmountTendered(o: PosOrder): number | null {
+    return readPosOrderPaidPrice(o);
+  }
+
+  /** How the order was settled when paid (cash, QR, or credit). */
+  paidSettlementLabel(o: PosOrder): string {
+    return this.i18n.orderPaymentMethodLabel(o);
+  }
+
+  /** Stored change from API, or paid price minus line total when paid price is known. */
+  paidChangeAmount(o: PosOrder): number | null {
+    const stored = readPosOrderChange(o);
+    if (stored !== null) {
+      return stored;
+    }
+    const t = this.paidAmountTendered(o);
+    if (t === null) {
       return null;
     }
-    if (typeof v === 'string' && v.trim() === '') {
+    const cents = Math.round(t * 100) - Math.round(this.totalPay(o) * 100);
+    if (cents < 0) {
       return null;
     }
-    const n = typeof v === 'number' ? v : Number(String(v).trim());
-    return Number.isFinite(n) ? n : null;
-  }
-
-  /** Formats API money fields; em dash when absent. */
-  formatRecordedMoney(v: number | string | null | undefined): string {
-    const n = this.numericOrNull(v);
-    return n == null ? '—' : n.toFixed(2);
-  }
-
-  recordedPaidPrice(o: PosOrder): string {
-    return this.formatRecordedMoney(o.paidPrice ?? o.paid_price);
-  }
-
-  recordedChange(o: PosOrder): string {
-    return this.formatRecordedMoney(o.change);
-  }
-
-  recordedOrderChange(o: PosOrder): string {
-    return this.formatRecordedMoney(o.orderChange ?? o.order_change);
-  }
-
-  recordedTotalPaid(o: PosOrder): string {
-    return this.formatRecordedMoney(o.totalPaid ?? o.total_paid);
+    return cents / 100;
   }
 
   formatDateShort(value: string | null | undefined): string {
     if (!value?.trim()) {
-      return '—';
+      return this.i18n.translate('common.emptyDash');
     }
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) {
       return value;
     }
     return d.toLocaleString();
-  }
-
-  paidViewOrderNo(vo: PosOrder): string {
-    return orderOrderNo(vo) || '—';
-  }
-
-  paidViewOrderDateIso(vo: PosOrder): string | null {
-    return orderOrderDate(vo);
-  }
-
-  paidViewPaidAtIso(vo: PosOrder): string | null {
-    return orderPaidAt(vo);
   }
 
   filterTables(ts: PosTable[]): PosTable[] {
@@ -327,8 +327,11 @@ export class OrderEditComponent {
     const q = this.foodSearch().trim().toLowerCase();
     const selId = Number(foodIdRaw ?? '');
     const base = !q
-      ? fs
-      : fs.filter((f) => foodPickerLabel(f).toLowerCase().includes(q));
+      ? fs.filter((f) => !foodBlocksOrderLines(f))
+      : fs.filter(
+          (f) =>
+            !foodBlocksOrderLines(f) && foodPickerLabel(f).toLowerCase().includes(q),
+        );
     if (!Number.isFinite(selId) || selId < 1) {
       return base;
     }
@@ -344,7 +347,8 @@ export class OrderEditComponent {
     if (
       f.controls.orderNo.invalid ||
       f.controls.orderDate.invalid ||
-      f.controls.version.invalid
+      f.controls.version.invalid ||
+      f.controls.orderNote.invalid
     ) {
       return false;
     }
@@ -363,6 +367,10 @@ export class OrderEditComponent {
           ? Number(g.get('foodId')?.value)
           : Number((g.get('manualFoodId')?.value ?? '').toString().trim());
       if (!Number.isFinite(fid) || fid < 1 || !Number.isFinite(q) || q < 1) {
+        return false;
+      }
+      const meta = fs.length > 0 ? fs.find((fx) => fx.id === fid) : undefined;
+      if (meta && foodBlocksOrderLines(meta)) {
         return false;
       }
     }
@@ -385,37 +393,35 @@ export class OrderEditComponent {
     const tableId =
       ts.length > 0 ? Number(v.tableId) : Number((v.manualTableId ?? '').toString().trim());
     const complateRaw = (v.complateOrderDate ?? '').toString().trim();
-    const loaded = this.loadedOrder();
-    const orderCreatorId = loaded ? orderUserId(loaded) : null;
-    const actorUserId = this.currentUser.requireUserId();
     const lines = (this.lines.controls as FormGroup[]).map((g) => {
       const foodId =
         fs.length > 0
           ? Number(g.get('foodId')?.value)
           : Number((g.get('manualFoodId')?.value ?? '').toString().trim());
-      const qty = Math.max(1, Math.floor(Number(g.get('quantity')?.value)));
-      const storedUid = Number(g.get('userId')?.value);
-      const lineUid =
-        Number.isFinite(storedUid) && storedUid > 0 ? storedUid : actorUserId;
-      return newOrderLineRequest(foodId, qty, undefined, lineUid);
+      const quantity = Math.max(1, Math.floor(Number(g.get('quantity')?.value)));
+      const note = trimNewLineNote(g.get('note')?.value);
+      return {
+        foodId,
+        quantity,
+        ...(note !== undefined ? { note } : {}),
+      };
     });
-    const body: OrderRequest = {
-      orderNo: (v.orderNo ?? '').trim(),
-      tableId,
-      orderDate: normalizeLocalDateTimeForApi((v.orderDate ?? '').toString()),
-      complateOrder: !!v.complateOrder,
-      complateOrderDate:
-        complateRaw.length > 0 ? normalizeLocalDateTimeForApi(complateRaw) : null,
-      cancel: !!v.cancel,
-      paid: false,
-      paidAt: null,
-      ...(loaded ? orderUserFields(loaded) : {}),
-      ...(orderCreatorId == null && actorUserId != null
-        ? { userId: actorUserId, user_id: actorUserId }
-        : {}),
-      lines,
-      version: Number(v.version),
-    };
+    const loaded = this.loadedOrder();
+    const body = mergeOrderRequestPaymentFromPosOrder(
+      {
+        orderNo: (v.orderNo ?? '').trim(),
+        tableId,
+        orderDate: normalizeLocalDateTimeForApi((v.orderDate ?? '').toString()),
+        complateOrder: !!v.complateOrder,
+        complateOrderDate:
+          complateRaw.length > 0 ? normalizeLocalDateTimeForApi(complateRaw) : null,
+        cancel: !!v.cancel,
+        lines,
+        version: Number(v.version),
+        note: (v.orderNote ?? '').trim().slice(0, 2000),
+      },
+      loaded,
+    );
     this.submitting.set(true);
     this.orderService
       .updateOrder(id, body)
@@ -432,6 +438,42 @@ export class OrderEditComponent {
       });
   }
 
+  savePaidOrderNote(): void {
+    const id = this.orderId();
+    const vo = this.paidView();
+    if (id == null || !vo || vo.id == null) {
+      return;
+    }
+    const note = this.paidNoteDraft().trim().slice(0, 2000);
+    this.paidNoteSaving.set(true);
+    this.paidNoteError.set(null);
+    this.orderService
+      .getOrderRowById(id)
+      .pipe(
+        switchMap((current) => {
+          const ver = Number(current.version);
+          if (!Number.isFinite(ver) || ver < 0) {
+            return throwError(
+              () => new Error(this.i18n.translate('order.versionMissing')),
+            );
+          }
+          const body: PatchOrderNoteRequest = { note, version: ver };
+          return this.orderService.patchOrderNote(id, body);
+        }),
+        finalize(() => this.paidNoteSaving.set(false)),
+      )
+      .subscribe({
+        next: (updated) => {
+          this.paidView.set(updated);
+          this.loadedOrder.set(updated);
+          this.paidNoteDraft.set(readPosOrderNote(updated) ?? '');
+        },
+        error: (err: unknown) => {
+          this.paidNoteError.set(this.formatHttpError(err));
+        },
+      });
+  }
+
   private formatHttpError(err: unknown): string {
     if (err instanceof HttpErrorResponse) {
       const b = err.error;
@@ -444,8 +486,11 @@ export class OrderEditComponent {
       if (typeof err.error === 'string' && err.error.length > 0) {
         return err.error;
       }
-      return err.message || `Request failed (${err.status})`;
+      return err.message || this.i18n.translate('common.requestFailedHttp', { status: err.status });
     }
-    return 'Could not save order.';
+    if (err instanceof Error && err.message) {
+      return err.message;
+    }
+    return this.i18n.translate('order.couldNotSave');
   }
 }

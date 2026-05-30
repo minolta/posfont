@@ -1,0 +1,38 @@
+<div class="login-page">
+  <div class="login-card">
+    <header class="login-head">
+      <h1 class="login-title">{{ 'auth.title' | t }}</h1>
+      <app-lang-switch class="lang-switch--light" />
+    </header>
+    <p class="login-hint">{{ 'auth.hint' | t }}</p>
+
+    @if (errorMessage(); as err) {
+      <div class="login-error" role="alert">{{ err }}</div>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="submit()" class="login-form" novalidate>
+      <label class="field">
+        <span class="label">{{ 'auth.username' | t }}</span>
+        <input type="text" formControlName="username" autocomplete="username" maxlength="255" />
+      </label>
+      @if (form.controls.username.invalid && form.controls.username.touched) {
+        <span class="field-error">{{ 'auth.usernameRequired' | t }}</span>
+      }
+
+      <label class="field">
+        <span class="label">{{ 'auth.password' | t }}</span>
+        <input type="password" formControlName="password" autocomplete="current-password" />
+      </label>
+      @if (form.controls.password.invalid && form.controls.password.touched) {
+        <span class="field-error">{{ 'auth.passwordRequired' | t }}</span>
+      }
+
+      <div class="actions">
+        <button type="submit" class="primary" [disabled]="submitting()">
+          {{ submitting() ? ('auth.signingIn' | t) : ('auth.signIn' | t) }}
+        </button>
+        <a routerLink="/tables" class="secondary-link">{{ 'auth.backToPos' | t }}</a>
+      </div>
+    </form>
+  </div>
+</div>

@@ -1,0 +1,191 @@
+<div class="report-page">
+  <a routerLink="/orders" class="back">{{ 'report.backOrders' | t }}</a>
+  <header class="report-head">
+    <div>
+      <h1>{{ 'report.dailyTitle' | t }}</h1>
+      <p class="hint">{{ 'report.dailyHint' | t }}</p>
+    </div>
+    <div class="controls">
+      <label class="field">
+        <span class="label-text">{{ 'report.startDate' | t }}</span>
+        <input
+          type="date"
+          [value]="startDate()"
+          [disabled]="loading()"
+          (change)="onStartChange($any($event.target).value)"
+        />
+      </label>
+      <label class="field">
+        <span class="label-text">{{ 'report.endDate' | t }}</span>
+        <input
+          type="date"
+          [value]="endDate()"
+          [disabled]="loading()"
+          (change)="onEndChange($any($event.target).value)"
+        />
+      </label>
+      <button type="button" class="btn-refresh" [disabled]="loading()" (click)="refresh()">
+        {{ loading() ? ('common.loading' | t) : ('common.refresh' | t) }}
+      </button>
+    </div>
+  </header>
+
+  @if (error(); as er) {
+    <p class="error-banner" role="alert">{{ er }}</p>
+  }
+
+  @if (loading() && report() === null) {
+    <p class="status">{{ 'common.loading' | t }}</p>
+  }
+
+  @if (report(); as r) {
+    <p class="source-line">
+      @if (r.source === 'api') {
+        <span class="badge badge-api">{{ 'report.serverReport' | t }}</span>
+      } @else {
+        <span class="badge badge-cli">{{ 'report.localAggregated' | t }}</span>
+        <span class="muted">{{ 'report.endpoint404' | t }}</span>
+      }
+      @if (isMultiDay(r)) {
+        <span class="range-pill mono">{{ r.startDate }} — {{ r.endDate }}</span>
+      }
+    </p>
+
+    <section class="summary">
+      <div class="tile">
+        <span class="tile-label">
+          @if (isMultiDay(r)) {
+            {{ 'report.ordersRange' | t }}
+          } @else {
+            {{ 'report.ordersDay' | t }}
+          }
+        </span>
+        <span class="tile-val mono">{{ r.orderCount }}</span>
+      </div>
+      <div class="tile">
+        <span class="tile-label">
+          @if (isMultiDay(r)) {
+            {{ 'report.paidInRange' | t }}
+          } @else {
+            {{ 'report.paidThisDay' | t }}
+          }
+        </span>
+        <span class="tile-val mono">{{ r.paidOrderCount }}</span>
+      </div>
+      <div class="tile">
+        <span class="tile-label">{{ 'report.salesDue' | t }}</span>
+        <span class="tile-val mono">{{ r.totalSales | number: '1.2-2' }}</span>
+      </div>
+      <div class="tile tile-cash">
+        <span class="tile-label">{{ 'report.realCash' | t }}</span>
+        <span class="tile-sublabel">{{ 'report.salesMinusQrCredit' | t }}</span>
+        <span class="tile-val mono">{{ r.realCashSalesDueInShop | number: '1.2-2' }}</span>
+      </div>
+      <div class="tile tile-cash">
+        <span class="tile-label">{{ 'report.cashReceived' | t }}</span>
+        <span class="tile-sublabel">{{ 'report.cashOnlyHint' | t }}</span>
+        <span class="tile-val mono">{{ r.totalCashReceived | number: '1.2-2' }}</span>
+      </div>
+      <div class="tile tile-qr">
+        <span class="tile-label">{{ 'report.paidByQr' | t }}</span>
+        <span class="tile-val mono">{{ r.paidByQrScanOrderCount }}</span>
+      </div>
+      <div class="tile tile-qr">
+        <span class="tile-label">{{ 'report.receivedQr' | t }}</span>
+        <span class="tile-val mono">{{ r.totalReceivedByQrScan | number: '1.2-2' }}</span>
+      </div>
+      <div class="tile tile-credit">
+        <span class="tile-label">{{ 'report.paidByCredit' | t }}</span>
+        <span class="tile-val mono">{{ r.paidByCreditOrderCount }}</span>
+      </div>
+      <div class="tile tile-credit">
+        <span class="tile-label">{{ 'report.receivedCredit' | t }}</span>
+        <span class="tile-val mono">{{ r.totalReceivedByCredit | number: '1.2-2' }}</span>
+      </div>
+      <div class="tile">
+        <span class="tile-label">{{ 'report.changeReturned' | t }}</span>
+        <span class="tile-sublabel">{{ 'report.fromCashOnly' | t }}</span>
+        <span class="tile-val mono">{{ r.totalChange | number: '1.2-2' }}</span>
+      </div>
+    </section>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>{{ 'common.order' | t }}</th>
+            <th>{{ 'report.paidAt' | t }}</th>
+            <th>{{ 'common.payment' | t }}</th>
+            <th>{{ 'report.orderNote' | t }}</th>
+            <th>{{ 'report.due' | t }}</th>
+            <th>{{ 'report.received' | t }}</th>
+            <th>{{ 'common.change' | t }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of r.rows; track row.orderId) {
+            <tr>
+              <td class="mono">
+                <a [routerLink]="['/orders', row.orderId, 'edit']" class="order-link">{{ row.orderNo }}</a>
+              </td>
+              <td>{{ row.paidAt | date: 'short' }}</td>
+              <td>
+                @if (row.paidByQrScan) {
+                  <span class="pay-kind pay-kind-qr">{{ 'order.paymentQr' | t }}</span>
+                } @else if (row.paidByCredit) {
+                  <span class="pay-kind pay-kind-credit">{{ 'order.paymentCredit' | t }}</span>
+                } @else {
+                  <span class="pay-kind pay-kind-cash">{{ 'order.paymentCash' | t }}</span>
+                }
+              </td>
+              <td class="report-order-note-cell" [attr.title]="row.orderNote || null">
+                @if (row.orderNote) {
+                  {{ row.orderNote }}
+                } @else {
+                  {{ 'common.emptyDash' | t }}
+                }
+              </td>
+              <td class="mono">{{ row.totalDue | number: '1.2-2' }}</td>
+              <td class="mono">{{ row.paidPrice != null ? (row.paidPrice | number: '1.2-2') : ('common.emptyDash' | t) }}</td>
+              <td class="mono">{{ row.change != null ? (row.change | number: '1.2-2') : ('common.emptyDash' | t) }}</td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="7" class="empty">{{ 'report.noPaidOrders' | t }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <h2 class="section-title">{{ 'report.byFood' | t }}</h2>
+    <p class="section-hint">{{ 'report.byFoodHint' | t }}</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>{{ 'common.code' | t }}</th>
+            <th>{{ 'common.name' | t }}</th>
+            <th>{{ 'common.qty' | t }}</th>
+            <th>{{ 'common.total' | t }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (f of r.foods; track f.foodCode + ':' + f.foodName) {
+            <tr>
+              <td class="mono">{{ f.foodCode }}</td>
+              <td>{{ f.foodName }}</td>
+              <td class="mono">{{ f.quantity }}</td>
+              <td class="mono">{{ f.total | number: '1.2-2' }}</td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="4" class="empty">{{ 'report.noLineItems' | t }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

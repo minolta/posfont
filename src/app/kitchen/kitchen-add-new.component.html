@@ -1,11 +1,7 @@
 <div class="page">
-  <a routerLink="/kitchens" class="back">← Back to kitchens</a>
-  <h1>Add kitchen</h1>
-  <p class="hint">
-    Creates a row via <code>POST /api/kitchens</code> with
-    <span class="mono">code</span>, <span class="mono">name</span>, and <span class="mono">version</span>
-    (<code>0</code> for new rows).
-  </p>
+  <a routerLink="/kitchens" class="back">{{ 'common.backTo' | t:{ target: ('kitchen.backKitchens' | t) } }}</a>
+  <h1>{{ 'kitchen.addTitle' | t }}</h1>
+  <p class="hint">{{ 'kitchen.addHint' | t }}</p>
 
   @if (errorMessage(); as msg) {
     <p class="error-banner" role="alert">{{ msg }}</p>
@@ -13,7 +9,7 @@
 
   <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
     <div class="field" [class.invalid]="form.controls.code.invalid && form.controls.code.touched">
-      <label for="kitchen-code">Code</label>
+      <label for="kitchen-code">{{ 'common.code' | t }}</label>
       <input
         id="kitchen-code"
         type="text"
@@ -21,33 +17,33 @@
         autocomplete="off"
         spellcheck="false"
         maxlength="255"
-        placeholder="e.g. MAIN"
+        [placeholder]="'kitchen.codeExample' | t"
         [readonly]="submitting()"
       />
       @if (form.controls.code.invalid && form.controls.code.touched) {
-        <span class="err">Enter a unique code (not only spaces).</span>
+        <span class="err">{{ 'common.uniqueCode' | t }}</span>
       }
     </div>
 
     <div class="field" [class.invalid]="form.controls.name.invalid && form.controls.name.touched">
-      <label for="kitchen-name">Name</label>
+      <label for="kitchen-name">{{ 'common.name' | t }}</label>
       <input
         id="kitchen-name"
         type="text"
         formControlName="name"
         autocomplete="off"
         maxlength="255"
-        placeholder="e.g. Main kitchen"
+        [placeholder]="'kitchen.nameExample' | t"
         [readonly]="submitting()"
       />
       @if (form.controls.name.invalid && form.controls.name.touched) {
-        <span class="err">Name is required (not only spaces).</span>
+        <span class="err">{{ 'kitchen.nameRequired' | t }}</span>
       }
     </div>
 
     <div class="actions">
       <button type="submit" [disabled]="submitting() || form.invalid">
-        {{ submitting() ? 'Saving…' : 'Create kitchen' }}
+        {{ submitting() ? ('common.saving' | t) : ('kitchen.createKitchen' | t) }}
       </button>
     </div>
   </form>
