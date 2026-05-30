@@ -125,10 +125,10 @@
           Order: <span class="mono">{{ po.orderNo }}</span>
         </p>
         <p class="pay-total">
-          Total to pay (ignore canceled lines):
+          Amount due (excludes canceled lines):
           <span class="mono">{{ payableTotal(po) | number: '1.2-2' }}</span>
         </p>
-        <label class="pay-input-label" for="table-pay-input-amount">Input total to pay</label>
+        <label class="pay-input-label" for="table-pay-input-amount">Amount customer gives</label>
         <input
           id="table-pay-input-amount"
           type="number"
@@ -141,6 +141,10 @@
           (click)="$any($event.target).select()"
           (input)="setPayInputAmount($any($event.target).value)"
         />
+        <p class="pay-change-line">
+          Change to return:
+          <span class="mono">{{ payDialogChangePreview() | number: '1.2-2' }}</span>
+        </p>
         <div class="pay-actions">
           <button
             type="button"

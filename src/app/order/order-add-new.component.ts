@@ -11,13 +11,14 @@ import {
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { catchError, finalize, forkJoin, map, of, switchMap } from 'rxjs';
 
+import { PosCurrentUserService } from '../auth/pos-current-user.service';
 import type { Food } from '../food/food.model';
 import { FoodService } from '../food/food.service';
 import type { PosTable } from '../table/table.model';
 import { TableService } from '../table/table.service';
 import { defaultDatetimeLocal, normalizeLocalDateTimeForApi } from './order-datetime.util';
 import { mergeFoodsFromApis, mergeTablesFromApis, foodPickerLabel, tablePickerLabel } from './order-merge.util';
-import type { OrderRequest } from './order.model';
+import { orderIsPaid, newOrderLineRequest, orderUserFieldsForActor, type OrderRequest } from './order.model';
 import { OrderService } from './order.service';
 
 @Component({
@@ -37,6 +38,7 @@ export class OrderAddNewComponent {
   private readonly foodService = inject(FoodService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly currentUser = inject(PosCurrentUserService);
 
   readonly submitting = signal(false);
   readonly errorMessage = signal<string | null>(null);
@@ -222,13 +224,21 @@ export class OrderAddNewComponent {
     const tableId =
       ts.length > 0 ? Number(v.tableId) : Number((v.manualTableId ?? '').toString().trim());
     const complateRaw = (v.complateOrderDate ?? '').toString().trim();
-    const lines = (this.lines.controls as FormGroup[]).map((g) => ({
-      foodId:
+    const actorUserId = this.currentUser.requireUserId();
+    if (actorUserId == null) {
+      this.errorMessage.set('Set your User ID in the header before creating an order.');
+      return;
+    }
+    const lines = (this.lines.controls as FormGroup[]).map((g) =>
+      newOrderLineRequest(
         fs.length > 0
           ? Number(g.get('foodId')?.value)
           : Number((g.get('manualFoodId')?.value ?? '').toString().trim()),
-      quantity: Math.max(1, Math.floor(Number(g.get('quantity')?.value))),
-    }));
+        Math.max(1, Math.floor(Number(g.get('quantity')?.value))),
+        'WAIT',
+        actorUserId,
+      ),
+    );
     const body: OrderRequest = {
       tableId,
       orderDate: normalizeLocalDateTimeForApi((v.orderDate ?? '').toString()),
@@ -236,6 +246,9 @@ export class OrderAddNewComponent {
       complateOrderDate:
         complateRaw.length > 0 ? normalizeLocalDateTimeForApi(complateRaw) : null,
       cancel: !!v.cancel,
+      paid: false,
+      paidAt: null,
+      ...orderUserFieldsForActor(actorUserId),
       lines,
       version: Number(v.version),
     };
@@ -245,7 +258,7 @@ export class OrderAddNewComponent {
       .pipe(
         switchMap((orders) => {
           const hasOpenUnpaidOnSameTable = orders.some(
-            (o) => o.table?.id === tableId && !o.paid && !o.cancel,
+            (o) => o.table?.id === tableId && !orderIsPaid(o) && !o.cancel,
           );
           if (hasOpenUnpaidOnSameTable) {
             this.errorMessage.set(

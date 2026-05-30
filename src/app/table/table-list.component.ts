@@ -1,6 +1,6 @@
 import { DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
@@ -15,11 +15,19 @@ import {
 
 import type { Zone } from '../zone/zone.model';
 import {
-  orderHasWaitingLines,
   orderRequestCompleteAllExceptCanceled,
   resolvedLineStatus,
 } from '../order/order-line-status.util';
-import type { OrderLine, PosOrder } from '../order/order.model';
+import {
+  computePaySettlement,
+  lineUnitPrice,
+  orderIsPaid,
+  orderPayStateForPut,
+  orderSettlementForPut,
+  type OrderLine,
+  type OrderRequest,
+  type PosOrder,
+} from '../order/order.model';
 import { OrderService } from '../order/order.service';
 import type { PosTable } from './table.model';
 import { TableService } from './table.service';
@@ -67,7 +75,7 @@ export class TableListComponent {
         const byTable = new Map<number, PosOrder>();
         for (const o of orders) {
           const tableId = o.table?.id;
-          if (tableId != null && o.id != null && !o.paid && !o.cancel && !byTable.has(tableId)) {
+          if (tableId != null && o.id != null && !orderIsPaid(o) && !o.cancel && !byTable.has(tableId)) {
             byTable.set(tableId, o);
           }
         }
@@ -77,6 +85,32 @@ export class TableListComponent {
     ),
     { initialValue: new Map<number, PosOrder>() },
   );
+
+  readonly payDialogChangePreview = computed(() => {
+    const id = this.payDialogOrderId();
+    if (id == null) {
+      return 0;
+    }
+    let order: PosOrder | undefined;
+    for (const o of this.openOrdersByTable().values()) {
+      if (o.id === id) {
+        order = o;
+        break;
+      }
+    }
+    if (order == null) {
+      return 0;
+    }
+    const raw = this.payInputAmount().trim();
+    if (raw === '') {
+      return 0;
+    }
+    const tendered = Number(raw);
+    if (!Number.isFinite(tendered)) {
+      return 0;
+    }
+    return computePaySettlement(this.payableTotal(order), tendered).change;
+  });
 
   readonly tables = toSignal(
     combineLatest([toObservable(this.searchTerm), toObservable(this.refreshNonce)]).pipe(
@@ -175,7 +209,7 @@ export class TableListComponent {
     }
     const amount = Number(this.payInputAmount());
     if (!Number.isFinite(amount) || amount < 0) {
-      this.payError.set('Please enter a valid amount to pay.');
+      this.payError.set('Please enter a valid cash amount from the customer.');
       return;
     }
     if (order.table?.id == null) {
@@ -183,19 +217,24 @@ export class TableListComponent {
       return;
     }
     const id = order.id;
-    const completeBody = orderRequestCompleteAllExceptCanceled(order);
-    if (orderHasWaitingLines(order) && completeBody == null) {
+    /** Always send every non-canceled line as COMPLETE on pay — many APIs keep `paid` false if any line is still WAIT. */
+    const lineUpdateBody = orderRequestCompleteAllExceptCanceled(order);
+    if (lineUpdateBody == null) {
       this.payError.set('Could not build line update for payment.');
       return;
     }
+    const settlement = computePaySettlement(this.payableTotal(order), amount);
+    const paidAt = new Date().toISOString().slice(0, 19);
+    const updatePayload: OrderRequest = {
+      ...lineUpdateBody,
+      ...orderSettlementForPut(settlement),
+      ...orderPayStateForPut(paidAt),
+      complateOrder: true,
+      complateOrderDate: paidAt,
+    };
     this.payingOrderId.set(id);
     this.payError.set(null);
-    const pay$ =
-      orderHasWaitingLines(order) && completeBody != null
-        ? this.orderService
-            .updateOrder(id, completeBody)
-            .pipe(switchMap(() => this.orderService.payOrder(id)))
-        : this.orderService.payOrder(id);
+    const pay$ = this.orderService.updateOrder(id, updatePayload);
     pay$
       .pipe(finalize(() => this.payingOrderId.set(null)))
       .subscribe({
@@ -206,7 +245,7 @@ export class TableListComponent {
         error: (err: unknown) => {
           this.payError.set(
             this.httpErrorDetail(err) ||
-              'Could not record payment (line update failed, already paid, or the API is unreachable).',
+              'Could not record payment (order update failed, already paid, or the API is unreachable).',
           );
         },
       });
@@ -221,7 +260,7 @@ export class TableListComponent {
       if (this.lineStatus(line, order) === 'CANCEL') {
         return sum;
       }
-      return sum + line.quantity * line.unitPrice;
+      return sum + line.quantity * lineUnitPrice(line);
     }, 0);
   }
 

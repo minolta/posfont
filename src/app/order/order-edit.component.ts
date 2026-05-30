@@ -12,6 +12,7 @@ import {
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { EMPTY, catchError, finalize, forkJoin, map, of, switchMap } from 'rxjs';
 
+import { PosCurrentUserService } from '../auth/pos-current-user.service';
 import type { Food } from '../food/food.model';
 import { FoodService } from '../food/food.service';
 import type { PosTable } from '../table/table.model';
@@ -22,7 +23,24 @@ import {
   normalizeLocalDateTimeForApi,
 } from './order-datetime.util';
 import { mergeFoodsFromApis, mergeTablesFromApis, foodPickerLabel, tablePickerLabel } from './order-merge.util';
-import type { OrderLine, OrderRequest, PosOrder } from './order.model';
+import { resolvedLineStatus } from './order-line-status.util';
+import {
+  lineFoodId,
+  lineUnitPrice,
+  lineUserId,
+  newOrderLineRequest,
+  orderComplated,
+  orderComplatedDate,
+  orderIsPaid,
+  orderOrderDate,
+  orderOrderNo,
+  orderPaidAt,
+  orderUserFields,
+  orderUserId,
+  type OrderLine,
+  type OrderRequest,
+  type PosOrder,
+} from './order.model';
 import { OrderService } from './order.service';
 
 @Component({
@@ -40,6 +58,7 @@ export class OrderEditComponent {
   private readonly orderService = inject(OrderService);
   private readonly tableService = inject(TableService);
   private readonly foodService = inject(FoodService);
+  private readonly currentUser = inject(PosCurrentUserService);
 
   readonly loading = signal(true);
   readonly loadError = signal<string | null>(null);
@@ -49,6 +68,7 @@ export class OrderEditComponent {
   readonly orderId = signal<number | null>(null);
   readonly orderPaid = signal(false);
   readonly paidView = signal<PosOrder | null>(null);
+  private readonly loadedOrder = signal<PosOrder | null>(null);
   readonly tableSearch = signal('');
   readonly foodSearch = signal('');
 
@@ -71,11 +91,13 @@ export class OrderEditComponent {
     return this.form.get('lines') as FormArray<FormGroup>;
   }
 
-  newLineGroup(): FormGroup {
+  newLineGroup(lineUserIdValue?: number | null): FormGroup {
+    const uid = lineUserIdValue ?? this.currentUser.userId();
     return this.fb.group({
       foodId: [''],
       manualFoodId: [''],
       quantity: [1, [Validators.required, Validators.min(1)]],
+      userId: [uid != null && uid > 0 ? String(uid) : ''],
     });
   }
 
@@ -144,23 +166,28 @@ export class OrderEditComponent {
           return;
         }
         this.loadError.set(null);
-        if (order.paid) {
+        if (orderIsPaid(order)) {
           this.orderPaid.set(true);
           this.paidView.set(order);
           return;
         }
         this.orderPaid.set(false);
         this.paidView.set(null);
+        this.loadedOrder.set(order);
         while (this.lines.length > 0) {
           this.lines.removeAt(0);
         }
         for (const ln of order.lines ?? []) {
-          const fid = ln.food?.id;
+          const fid = lineFoodId(ln);
           this.lines.push(
             this.fb.group({
               foodId: [fid != null ? String(fid) : ''],
               manualFoodId: [fid != null ? String(fid) : ''],
               quantity: [ln.quantity ?? 1, [Validators.required, Validators.min(1)]],
+              userId: [(() => {
+                const uid = lineUserId(ln);
+                return uid != null ? String(uid) : '';
+              })()],
             }),
           );
         }
@@ -169,13 +196,13 @@ export class OrderEditComponent {
         }
         const tid = order.table?.id;
         this.form.patchValue({
-          orderNo: order.orderNo,
+          orderNo: orderOrderNo(order),
           tableId: tid != null ? String(tid) : '',
           manualTableId: tid != null ? String(tid) : '',
-          orderDate: isoToDatetimeLocal(order.orderDate) || defaultDatetimeLocal(),
-          complateOrder: order.complateOrder,
-          complateOrderDate: order.complateOrderDate
-            ? isoToDatetimeLocal(order.complateOrderDate)
+          orderDate: isoToDatetimeLocal(orderOrderDate(order)) || defaultDatetimeLocal(),
+          complateOrder: orderComplated(order),
+          complateOrderDate: orderComplatedDate(order)
+            ? isoToDatetimeLocal(orderComplatedDate(order))
             : '',
           cancel: order.cancel,
           version: order.version,
@@ -205,22 +232,13 @@ export class OrderEditComponent {
     return lines
       .map((ln) => {
         const label = this.foodLabel(ln.food);
-        return `${ln.quantity}× ${label} @ ${ln.unitPrice}`;
+        return `${ln.quantity}× ${label} @ ${lineUnitPrice(ln)}`;
       })
       .join('; ');
   }
 
   lineStatus(line: OrderLine, order: PosOrder): 'WAIT' | 'COMPLETE' | 'CANCEL' {
-    if (line.status) {
-      return line.status;
-    }
-    if (order.cancel) {
-      return 'CANCEL';
-    }
-    if (order.complateOrder || order.paid) {
-      return 'COMPLETE';
-    }
-    return 'WAIT';
+    return resolvedLineStatus(line, order);
   }
 
   totalPay(o: PosOrder): number {
@@ -228,8 +246,41 @@ export class OrderEditComponent {
       if (this.lineStatus(ln, o) === 'CANCEL') {
         return sum;
       }
-      return sum + ln.quantity * ln.unitPrice;
+      return sum + ln.quantity * lineUnitPrice(ln);
     }, 0);
+  }
+
+  private numericOrNull(v: number | string | null | undefined): number | null {
+    if (v == null) {
+      return null;
+    }
+    if (typeof v === 'string' && v.trim() === '') {
+      return null;
+    }
+    const n = typeof v === 'number' ? v : Number(String(v).trim());
+    return Number.isFinite(n) ? n : null;
+  }
+
+  /** Formats API money fields; em dash when absent. */
+  formatRecordedMoney(v: number | string | null | undefined): string {
+    const n = this.numericOrNull(v);
+    return n == null ? '—' : n.toFixed(2);
+  }
+
+  recordedPaidPrice(o: PosOrder): string {
+    return this.formatRecordedMoney(o.paidPrice ?? o.paid_price);
+  }
+
+  recordedChange(o: PosOrder): string {
+    return this.formatRecordedMoney(o.change);
+  }
+
+  recordedOrderChange(o: PosOrder): string {
+    return this.formatRecordedMoney(o.orderChange ?? o.order_change);
+  }
+
+  recordedTotalPaid(o: PosOrder): string {
+    return this.formatRecordedMoney(o.totalPaid ?? o.total_paid);
   }
 
   formatDateShort(value: string | null | undefined): string {
@@ -241,6 +292,18 @@ export class OrderEditComponent {
       return value;
     }
     return d.toLocaleString();
+  }
+
+  paidViewOrderNo(vo: PosOrder): string {
+    return orderOrderNo(vo) || '—';
+  }
+
+  paidViewOrderDateIso(vo: PosOrder): string | null {
+    return orderOrderDate(vo);
+  }
+
+  paidViewPaidAtIso(vo: PosOrder): string | null {
+    return orderPaidAt(vo);
   }
 
   filterTables(ts: PosTable[]): PosTable[] {
@@ -322,13 +385,20 @@ export class OrderEditComponent {
     const tableId =
       ts.length > 0 ? Number(v.tableId) : Number((v.manualTableId ?? '').toString().trim());
     const complateRaw = (v.complateOrderDate ?? '').toString().trim();
-    const lines = (this.lines.controls as FormGroup[]).map((g) => ({
-      foodId:
+    const loaded = this.loadedOrder();
+    const orderCreatorId = loaded ? orderUserId(loaded) : null;
+    const actorUserId = this.currentUser.requireUserId();
+    const lines = (this.lines.controls as FormGroup[]).map((g) => {
+      const foodId =
         fs.length > 0
           ? Number(g.get('foodId')?.value)
-          : Number((g.get('manualFoodId')?.value ?? '').toString().trim()),
-      quantity: Math.max(1, Math.floor(Number(g.get('quantity')?.value))),
-    }));
+          : Number((g.get('manualFoodId')?.value ?? '').toString().trim());
+      const qty = Math.max(1, Math.floor(Number(g.get('quantity')?.value)));
+      const storedUid = Number(g.get('userId')?.value);
+      const lineUid =
+        Number.isFinite(storedUid) && storedUid > 0 ? storedUid : actorUserId;
+      return newOrderLineRequest(foodId, qty, undefined, lineUid);
+    });
     const body: OrderRequest = {
       orderNo: (v.orderNo ?? '').trim(),
       tableId,
@@ -337,6 +407,12 @@ export class OrderEditComponent {
       complateOrderDate:
         complateRaw.length > 0 ? normalizeLocalDateTimeForApi(complateRaw) : null,
       cancel: !!v.cancel,
+      paid: false,
+      paidAt: null,
+      ...(loaded ? orderUserFields(loaded) : {}),
+      ...(orderCreatorId == null && actorUserId != null
+        ? { userId: actorUserId, user_id: actorUserId }
+        : {}),
       lines,
       version: Number(v.version),
     };

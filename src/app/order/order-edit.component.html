@@ -3,7 +3,7 @@
   <h1>Edit order</h1>
   <p class="hint">
     Updates via <code>PUT /api/orders/&#123;id&#125;</code> when the order is not paid. Keep <span class="mono">version</span> in sync
-    (optimistic lock). Paid orders are read-only here; use <strong>Pay</strong> from the list.
+    (optimistic lock). Paid orders are read-only here; settle from the <strong>Orders</strong> list (same <code>PUT</code> with <code>paid</code> and amounts).
   </p>
 
   @if (loading()) {
@@ -15,17 +15,25 @@
       <p class="info-banner">This order is <strong>paid</strong> and cannot be edited.</p>
       <dl class="readonly-dl">
         <dt>Order no.</dt>
-        <dd class="mono">{{ vo.orderNo }}</dd>
+        <dd class="mono">{{ paidViewOrderNo(vo) }}</dd>
         <dt>Table</dt>
         <dd>{{ tableCell(vo.table) }}</dd>
         <dt>Lines</dt>
         <dd>{{ linesSummary(vo) }}</dd>
         <dt>Order date</dt>
-        <dd>{{ formatDateShort(vo.orderDate) }}</dd>
+        <dd>{{ formatDateShort(paidViewOrderDateIso(vo)) }}</dd>
         <dt>Paid at</dt>
-        <dd>{{ formatDateShort(vo.paidAt) }}</dd>
-        <dt>Total pay</dt>
+        <dd>{{ formatDateShort(paidViewPaidAtIso(vo)) }}</dd>
+        <dt>Total price</dt>
         <dd class="mono">{{ totalPay(vo) | number: '1.2-2' }}</dd>
+        <dt>Paid price</dt>
+        <dd class="mono">{{ recordedPaidPrice(vo) }}</dd>
+        <dt>Change</dt>
+        <dd class="mono">{{ recordedChange(vo) }}</dd>
+        <dt>Order change</dt>
+        <dd class="mono">{{ recordedOrderChange(vo) }}</dd>
+        <dt>Total paid (cash received)</dt>
+        <dd class="mono">{{ recordedTotalPaid(vo) }}</dd>
         <dt>Version</dt>
         <dd class="mono">{{ vo.version }}</dd>
       </dl>

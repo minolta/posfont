@@ -1,6 +1,6 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
@@ -13,6 +13,7 @@ import {
   timer,
 } from 'rxjs';
 
+import { PosCurrentUserService } from '../auth/pos-current-user.service';
 import type { Food } from '../food/food.model';
 import { FoodService } from '../food/food.service';
 import type { PosTable } from '../table/table.model';
@@ -22,7 +23,25 @@ import {
   orderRequestCompleteAllExceptCanceled,
   resolvedLineStatus,
 } from './order-line-status.util';
-import type { OrderLine, OrderRequest, PosOrder } from './order.model';
+import {
+  computePaySettlement,
+  lineUnitPrice,
+  newOrderLineRequest,
+  orderAfterPayPatch,
+  orderComplated,
+  orderComplatedDate,
+  orderIsPaid,
+  orderLineToRequest,
+  orderOrderDate,
+  orderOrderNo,
+  orderPaidFields,
+  orderPayStateForPut,
+  orderSettlementForPut,
+  orderUserFields,
+  type OrderLine,
+  type OrderRequest,
+  type PosOrder,
+} from './order.model';
 import { OrderService } from './order.service';
 
 @Component({
@@ -39,6 +58,7 @@ export class OrderListComponent {
   private readonly foodService = inject(FoodService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly currentUser = inject(PosCurrentUserService);
 
   readonly createdId = toSignal(
     this.route.queryParamMap.pipe(map((p) => p.get('created'))),
@@ -52,6 +72,8 @@ export class OrderListComponent {
 
   readonly searchTerm = signal('');
   readonly refreshNonce = signal(0);
+  /** Merged on top of GET `/api/orders` until the list reflects pay (GET is often stale). */
+  private readonly orderRowPatchById = signal(new Map<number, PosOrder>());
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly deletingId = signal<number | null>(null);
@@ -81,15 +103,34 @@ export class OrderListComponent {
   );
 
   constructor() {
+    effect(() => {
+      const rawList = this.orders();
+      if (rawList.length === 0) {
+        return;
+      }
+      this.orderRowPatchById.update((m) => {
+        if (m.size === 0) {
+          return m;
+        }
+        const next = new Map(m);
+        for (const o of rawList) {
+          if (o.id != null && orderIsPaid(o)) {
+            next.delete(o.id);
+          }
+        }
+        return next.size !== m.size ? next : m;
+      });
+    });
+
     combineLatest([this.route.queryParamMap, toObservable(this.orders)]).subscribe(([qpm, orders]) => {
       const openPayId = Number(qpm.get('openPayId') ?? '');
       if (Number.isFinite(openPayId) && openPayId > 0) {
-        const payOrder = orders.find((o) => o.id === openPayId);
-        if (!payOrder) {
+        const orderForPay = orders.find((o) => o.id === openPayId);
+        if (!orderForPay) {
           return;
         }
-        if (!payOrder.paid) {
-          this.openPayDialog(payOrder);
+        if (!orderIsPaid(orderForPay)) {
+          this.openPayDialog(orderForPay);
         }
         void this.router.navigate([], {
           relativeTo: this.route,
@@ -161,6 +202,51 @@ export class OrderListComponent {
     { initialValue: [] as PosOrder[] },
   );
 
+  /** List rows with short-lived pay patches applied (see {@link orderRowPatchById}). */
+  readonly ordersView = computed(() => {
+    const list = this.orders();
+    const patches = this.orderRowPatchById();
+    if (patches.size === 0) {
+      return list;
+    }
+    return list.map((o) => {
+      if (o.id == null) {
+        return o;
+      }
+      const p = patches.get(o.id);
+      return p ?? o;
+    });
+  });
+
+  readonly payDialogOrder = computed(() => {
+    const id = this.payDialogOrderId();
+    if (id == null) {
+      return undefined;
+    }
+    return this.ordersView().find((o) => o.id === id);
+  });
+
+  /** Updates when `payInputAmount` or the open pay order changes (OnPush-safe live “change” preview). */
+  readonly payDialogChangePreview = computed(() => {
+    const id = this.payDialogOrderId();
+    if (id == null) {
+      return 0;
+    }
+    const order = this.ordersView().find((o) => o.id === id);
+    if (order == null) {
+      return 0;
+    }
+    const raw = this.payInputAmount().trim();
+    if (raw === '') {
+      return 0;
+    }
+    const tendered = Number(raw);
+    if (!Number.isFinite(tendered)) {
+      return 0;
+    }
+    return computePaySettlement(this.payableTotal(order), tendered).change;
+  });
+
   onSearchInput(value: string): void {
     this.searchTerm.set(value);
   }
@@ -170,7 +256,7 @@ export class OrderListComponent {
       return;
     }
     this.deleteError.set(null);
-    if (!window.confirm(`Delete order "${o.orderNo}"?`)) {
+    if (!window.confirm(`Delete order "${orderOrderNo(o)}"?`)) {
       return;
     }
     this.deletingId.set(o.id);
@@ -186,7 +272,7 @@ export class OrderListComponent {
   }
 
   openPayDialog(o: PosOrder): void {
-    if (o.id == null || o.paid) {
+    if (o.id == null || orderIsPaid(o)) {
       return;
     }
     this.payError.set(null);
@@ -199,14 +285,6 @@ export class OrderListComponent {
     this.payInputAmount.set('');
   }
 
-  payDialogOrder(): PosOrder | undefined {
-    const id = this.payDialogOrderId();
-    if (id == null) {
-      return undefined;
-    }
-    return this.orders().find((o) => o.id === id);
-  }
-
   confirmPayFromDialog(): void {
     const order = this.payDialogOrder();
     if (!order || order.id == null) {
@@ -215,7 +293,7 @@ export class OrderListComponent {
     }
     const amount = Number(this.payInputAmount());
     if (!Number.isFinite(amount) || amount < 0) {
-      this.payError.set('Please enter a valid amount to pay.');
+      this.payError.set('Please enter a valid cash amount from the customer.');
       return;
     }
     if (order.table?.id == null) {
@@ -223,30 +301,39 @@ export class OrderListComponent {
       return;
     }
     const id = order.id;
-    const completeBody = orderRequestCompleteAllExceptCanceled(order);
-    if (orderHasWaitingLines(order) && completeBody == null) {
+    /** Always send every non-canceled line as COMPLETE on pay — many APIs keep `paid` false if any line is still WAIT. */
+    const lineUpdateBody = orderRequestCompleteAllExceptCanceled(order);
+    if (lineUpdateBody == null) {
       this.payError.set('Could not build line update for payment.');
       return;
     }
+    const settlement = computePaySettlement(this.payableTotal(order), amount);
+    const paidAt = new Date().toISOString().slice(0, 19);
+    const updatePayload: OrderRequest = {
+      ...lineUpdateBody,
+      ...orderSettlementForPut(settlement),
+      ...orderPayStateForPut(paidAt),
+      complateOrder: true,
+      complateOrderDate: paidAt,
+    };
     this.payingId.set(id);
     this.payError.set(null);
-    const pay$ =
-      orderHasWaitingLines(order) && completeBody != null
-        ? this.orderService
-            .updateOrder(id, completeBody)
-            .pipe(switchMap(() => this.orderService.payOrder(id)))
-        : this.orderService.payOrder(id);
+    const pay$ = this.orderService.updateOrder(id, updatePayload);
     pay$
       .pipe(finalize(() => this.payingId.set(null)))
       .subscribe({
-        next: () => {
+        next: (updated) => {
+          const patch = orderAfterPayPatch(order, updated, paidAt, settlement);
+          if (order.id != null) {
+            this.orderRowPatchById.update((m) => new Map(m).set(order.id!, patch));
+          }
           this.closePayDialog();
           this.refreshNonce.update((n) => n + 1);
         },
         error: (err: unknown) => {
           this.payError.set(
             this.httpErrorDetail(err) ||
-              'Could not record payment (line update failed, already paid, or the API is unreachable).',
+              'Could not record payment (order update failed, already paid, or the API is unreachable).',
           );
         },
       });
@@ -298,7 +385,7 @@ export class OrderListComponent {
   }
 
   addLineFromList(o: PosOrder): void {
-    if (o.id == null || o.paid) {
+    if (o.id == null || orderIsPaid(o)) {
       return;
     }
     const orderId = o.id;
@@ -360,7 +447,7 @@ export class OrderListComponent {
   }
 
   completeAllLineStatuses(o: PosOrder): void {
-    if (o.id == null || o.paid) {
+    if (o.id == null || orderIsPaid(o)) {
       return;
     }
     if (!this.hasWaitingLines(o)) {
@@ -389,7 +476,7 @@ export class OrderListComponent {
     lineIndex: number,
     target: 'COMPLETE' | 'CANCEL',
   ): void {
-    if (o.id == null || o.paid) {
+    if (o.id == null || orderIsPaid(o)) {
       return;
     }
     const tableId = o.table?.id;
@@ -400,18 +487,19 @@ export class OrderListComponent {
     this.statusError.set(null);
     const now = new Date().toISOString().slice(0, 19);
     const body: OrderRequest = {
-      orderNo: o.orderNo,
+      orderNo: orderOrderNo(o),
       tableId,
-      orderDate: o.orderDate ?? now,
+      orderDate: orderOrderDate(o) ?? now,
       complateOrder: target === 'COMPLETE',
       complateOrderDate: target === 'COMPLETE' ? now : null,
       cancel: target === 'CANCEL',
+      ...orderPaidFields(o),
+      ...orderUserFields(o),
       version: o.version,
-      lines: (o.lines ?? []).map((ln, idx) => ({
-        foodId: ln.food?.id ?? 0,
-        quantity: ln.quantity,
-        status: idx === lineIndex ? target : this.lineStatus(ln, o),
-      }))
+      lines: (o.lines ?? [])
+        .map((ln, idx) =>
+          orderLineToRequest(ln, idx === lineIndex ? target : this.lineStatus(ln, o)),
+        )
         .filter((ln) => ln.foodId > 0),
     };
     const lineKey = this.lineUpdateKey(o.id, lineIndex);
@@ -455,7 +543,7 @@ export class OrderListComponent {
   }
 
   orderTotal(o: PosOrder): number {
-    return (o.lines ?? []).reduce((sum, ln) => sum + ln.quantity * ln.unitPrice, 0);
+    return (o.lines ?? []).reduce((sum, ln) => sum + ln.quantity * lineUnitPrice(ln), 0);
   }
 
   payableTotal(o: PosOrder): number {
@@ -463,7 +551,7 @@ export class OrderListComponent {
       if (this.lineStatus(ln, o) === 'CANCEL') {
         return sum;
       }
-      return sum + ln.quantity * ln.unitPrice;
+      return sum + ln.quantity * lineUnitPrice(ln);
     }, 0);
   }
 
@@ -478,10 +566,31 @@ export class OrderListComponent {
     if (o.cancel) {
       return 'CANCEL';
     }
-    if (o.complateOrder || o.paid) {
+    if (orderComplated(o) || orderIsPaid(o)) {
       return 'COMPLETE';
     }
     return 'WAIT';
+  }
+
+  isOrderPaid(o: PosOrder): boolean {
+    return orderIsPaid(o);
+  }
+
+  displayOrderNo(o: PosOrder): string {
+    return orderOrderNo(o) || '—';
+  }
+
+  listOrderDateIso(o: PosOrder): string | null {
+    const d = orderOrderDate(o);
+    return d != null && String(d).trim() !== '' ? d : null;
+  }
+
+  isOrderComplated(o: PosOrder): boolean {
+    return orderComplated(o);
+  }
+
+  lineUnitPriceFor(ln: OrderLine): number {
+    return lineUnitPrice(ln);
   }
 
   private extractErrorMessage(err: unknown): string {
@@ -514,21 +623,24 @@ export class OrderListComponent {
       this.addLineError.set('Order has no table reference and cannot be updated.');
       return;
     }
+    const actorUserId = this.currentUser.requireUserId();
+    if (actorUserId == null) {
+      this.addLineError.set('Set your User ID in the header before adding order lines.');
+      return;
+    }
     const body: OrderRequest = {
-      orderNo: o.orderNo,
+      orderNo: orderOrderNo(o),
       tableId,
-      orderDate: o.orderDate ?? new Date().toISOString().slice(0, 19),
-      complateOrder: o.complateOrder,
-      complateOrderDate: o.complateOrderDate,
+      orderDate: orderOrderDate(o) ?? new Date().toISOString().slice(0, 19),
+      complateOrder: orderComplated(o),
+      complateOrderDate: orderComplatedDate(o),
       cancel: o.cancel,
+      ...orderPaidFields(o),
+      ...orderUserFields(o),
       version: o.version,
       lines: [
-        ...(o.lines ?? []).map((ln) => ({
-          foodId: ln.food?.id ?? 0,
-          quantity: ln.quantity,
-          status: this.lineStatus(ln, o),
-        })),
-        { foodId, quantity: qty, status: 'WAIT' as const },
+        ...(o.lines ?? []).map((ln) => orderLineToRequest(ln, this.lineStatus(ln, o))),
+        newOrderLineRequest(foodId, qty, 'WAIT', actorUserId),
       ].filter((ln) => ln.foodId > 0),
     };
     this.addingLineId.set(orderId);
@@ -554,8 +666,13 @@ export class OrderListComponent {
   ): void {
     const orderId = o.id;
     const tableId = o.table?.id;
-    if (orderId == null || tableId == null || o.paid) {
+    if (orderId == null || tableId == null || orderIsPaid(o)) {
       this.addLineError.set('Order cannot be updated.');
+      return;
+    }
+    const actorUserId = this.currentUser.requireUserId();
+    if (actorUserId == null) {
+      this.addLineError.set('Set your User ID in the header before adding order lines.');
       return;
     }
     const merged = new Map<number, number>();
@@ -564,24 +681,20 @@ export class OrderListComponent {
       merged.set(item.foodId, curr + Math.max(1, Math.floor(item.qty)));
     }
     const body: OrderRequest = {
-      orderNo: o.orderNo,
+      orderNo: orderOrderNo(o),
       tableId,
-      orderDate: o.orderDate ?? new Date().toISOString().slice(0, 19),
-      complateOrder: o.complateOrder,
-      complateOrderDate: o.complateOrderDate,
+      orderDate: orderOrderDate(o) ?? new Date().toISOString().slice(0, 19),
+      complateOrder: orderComplated(o),
+      complateOrderDate: orderComplatedDate(o),
       cancel: o.cancel,
+      ...orderPaidFields(o),
+      ...orderUserFields(o),
       version: o.version,
       lines: [
-        ...(o.lines ?? []).map((ln) => ({
-          foodId: ln.food?.id ?? 0,
-          quantity: ln.quantity,
-          status: this.lineStatus(ln, o),
-        })),
-        ...[...merged.entries()].map(([foodId, quantity]) => ({
-          foodId,
-          quantity,
-          status: 'WAIT' as const,
-        })),
+        ...(o.lines ?? []).map((ln) => orderLineToRequest(ln, this.lineStatus(ln, o))),
+        ...[...merged.entries()].map(([foodId, quantity]) =>
+          newOrderLineRequest(foodId, quantity, 'WAIT', actorUserId),
+        ),
       ].filter((ln) => ln.foodId > 0),
     };
     this.addingLineId.set(orderId);

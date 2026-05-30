@@ -1,0 +1,27 @@
+---
+description: POS backend API location and sync with this Angular app (posfont)
+alwaysApply: true
+---
+
+# POS backend API
+
+This workspace (`posfont`) is the **Angular frontend only**.
+
+The **backend API** is a separate Spring Boot / Kotlin project:
+
+**`f:/src/pos/api/pos`**
+
+- Package root: `me.pixka.pos`
+- Default URL: `http://localhost:8080` (see `src/app/app.config.ts` → `POS_API_BASE_URL`)
+- Run: `cd f:/src/pos/api/pos && mvn spring-boot:run`
+- Tests: `cd f:/src/pos/api/pos && mvn test`
+
+When changing API behaviour, entities, or DTOs, edit the **backend** at `f:/src/pos/api/pos`, then mirror types and HTTP calls in this frontend.
+
+**Read first:** `f:/src/pos/api/pos/NOTIFY-FRONTEND.md` (checklist + Angular file mapping).
+
+| Backend | Frontend (this repo) |
+|---------|----------------------|
+| `f:/src/pos/api/pos` | `f:/src/pos/posfont` |
+| `*/model/*.kt`, `*/api/*Request.kt` | `src/app/*/*.model.ts` |
+| `*/api/*Controller.kt` | `src/app/*/*.service.ts` |

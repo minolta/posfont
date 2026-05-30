@@ -2,7 +2,8 @@
   <h1>Orders</h1>
   <p class="hint">
     Search matches <span class="mono">orderNo</span> on the server (<code>GET /api/orders?q=</code>). Orders have
-    <strong>lines</strong> (food + quantity); use <strong>Pay</strong> to settle (<code>POST …/pay</code>).
+    <strong>lines</strong> (food + quantity); use <strong>Pay</strong> to settle via <code>PUT /api/orders/&#123;id&#125;</code>
+    (paid, amounts, and lines).
   </p>
 
   @if (createdId(); as cid) {
@@ -70,19 +71,19 @@
         </tr>
       </thead>
       <tbody>
-        @if (loading() && orders().length === 0) {
+        @if (loading() && ordersView().length === 0) {
           <tr>
             <td class="empty" colspan="11">Loading…</td>
           </tr>
         }
-        @for (o of orders(); track o.id ?? $index) {
+        @for (o of ordersView(); track o.id ?? $index) {
           <tr>
             <td class="mono">{{ o.id }}</td>
             <td class="mono">
               @if (o.id != null) {
-                <a [routerLink]="['/orders', o.id, 'edit']" class="order-no-link">{{ o.orderNo }}</a>
+                <a [routerLink]="['/orders', o.id, 'edit']" class="order-no-link">{{ displayOrderNo(o) }}</a>
               } @else {
-                {{ o.orderNo }}
+                {{ displayOrderNo(o) }}
               }
             </td>
             <td>{{ tableCell(o.table) }}</td>
@@ -95,10 +96,16 @@
                 —
               }
             </td>
-            <td>{{ o.orderDate | date: 'short' }}</td>
-            <td>{{ o.complateOrder ? 'Yes' : 'No' }}</td>
+            <td>
+              @if (listOrderDateIso(o); as od) {
+                {{ od | date: 'short' }}
+              } @else {
+                —
+              }
+            </td>
+            <td>{{ isOrderComplated(o) ? 'Yes' : 'No' }}</td>
             <td>{{ o.cancel ? 'Yes' : 'No' }}</td>
-            <td>{{ o.paid ? 'Yes' : 'No' }}</td>
+            <td>{{ isOrderPaid(o) ? 'Yes' : 'No' }}</td>
             <td class="mono" [attr.title]="'Total/Get pay (exclude canceled lines)'">
               {{ orderTotal(o) | number: '1.0-2' }}/<span class="payable-value">{{
                 payableTotal(o) | number: '1.0-2'
@@ -108,7 +115,7 @@
             <td class="col-actions">
               @if (o.id != null) {
                 <div class="order-actions">
-                  @if (!o.paid) {
+                  @if (!isOrderPaid(o)) {
                     <button
                       type="button"
                       class="pay-btn"
@@ -153,7 +160,7 @@
                       </tr>
                     </thead>
                     <tbody>
-                      @if (!o.paid && o.id != null && o.lines.length > 0) {
+                      @if (!isOrderPaid(o) && o.id != null && o.lines.length > 0) {
                         <tr class="line-list-actions-row">
                           <td colspan="4" class="line-list-actions-cell">
                             <button
@@ -178,7 +185,7 @@
                         <tr>
                           <td>{{ foodLabel(ln.food) }}</td>
                           <td>{{ ln.quantity }}</td>
-                          <td>{{ ln.unitPrice }}</td>
+                          <td>{{ lineUnitPriceFor(ln) }}</td>
                           <td>
                             <div class="line-status-wrap">
                             <span
@@ -191,7 +198,7 @@
                             >
                               {{ lineStatusIcon(lineStatus(ln, o)) }}
                             </span>
-                            @if (!o.paid) {
+                            @if (!isOrderPaid(o)) {
                               <button
                                 type="button"
                                 class="icon-status-btn complete"
@@ -243,13 +250,13 @@
       <div class="pay-dialog" (click)="$event.stopPropagation()">
         <h3>Confirm payment</h3>
         <p class="dialog-order-no">
-          Order: <span class="mono">{{ po.orderNo }}</span>
+          Order: <span class="mono">{{ displayOrderNo(po) }}</span>
         </p>
         <p class="pay-total">
-          Total to pay (ignore canceled lines):
+          Amount due (excludes canceled lines):
           <span class="mono">{{ payableTotal(po) | number: '1.2-2' }}</span>
         </p>
-        <label class="pay-input-label" for="pay-input-amount">Input total to pay</label>
+        <label class="pay-input-label" for="pay-input-amount">Amount customer gives</label>
         <input
           id="pay-input-amount"
           type="number"
@@ -262,6 +269,10 @@
           (click)="$any($event.target).select()"
           (input)="setPayInputAmount($any($event.target).value)"
         />
+        <p class="pay-change-line">
+          Change to return:
+          <span class="mono">{{ payDialogChangePreview() | number: '1.2-2' }}</span>
+        </p>
         <div class="dialog-actions">
           <button
             type="button"

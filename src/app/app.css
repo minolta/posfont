@@ -59,6 +59,34 @@
   background: rgba(255, 255, 255, 0.14);
 }
 
+.user-id-field {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.user-id-label {
+  font-size: 0.8rem;
+  color: #ccc;
+  white-space: nowrap;
+}
+
+.user-id-input {
+  width: 5rem;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 0.85rem;
+}
+
+.user-id-input::placeholder {
+  color: #888;
+}
+
 .app-main {
   flex: 1;
   padding: 0;
