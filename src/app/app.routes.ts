@@ -121,6 +121,36 @@ export const routes: Routes = [
       import('./food-category/food-category-list.component').then((m) => m.FoodCategoryListComponent),
   },
   {
+    path: 'materials/import-receipt',
+    loadComponent: () =>
+      import('./material/material-import-receipt.component').then((m) => m.MaterialImportReceiptComponent),
+  },
+  {
+    path: 'materials/buy',
+    loadComponent: () =>
+      import('./material/material-buy.component').then((m) => m.MaterialBuyComponent),
+  },
+  {
+    path: 'materials/new',
+    loadComponent: () =>
+      import('./material/material-add-new.component').then((m) => m.MaterialAddNewComponent),
+  },
+  {
+    path: 'materials/:id/edit',
+    loadComponent: () =>
+      import('./material/material-edit.component').then((m) => m.MaterialEditComponent),
+  },
+  {
+    path: 'materials',
+    loadComponent: () =>
+      import('./material/material-list.component').then((m) => m.MaterialListComponent),
+  },
+  {
+    path: 'boms',
+    loadComponent: () =>
+      import('./bom/bom-management.component').then((m) => m.BomManagementComponent),
+  },
+  {
     path: 'foods/new',
     loadComponent: () =>
       import('./food/food-add-new.component').then((m) => m.FoodAddNewComponent),

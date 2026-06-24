@@ -153,6 +153,61 @@
         </div>
       </div>
 
+      <fieldset class="bom-block">
+        <legend>{{ 'food.bomTitle' | t }}</legend>
+        <p class="hint-inline">{{ 'food.bomHint' | t }}</p>
+        @if (materials().length === 0) {
+          <p class="hint-inline">
+            {{ 'food.bomNoMaterials' | t }}
+            <a routerLink="/materials/new">{{ 'material.newMaterial' | t }}</a>
+          </p>
+        } @else {
+          <div class="pick-with-search">
+            <label class="label-text" for="bom-material-search">{{ 'food.bomFindMaterial' | t }}</label>
+            <input
+              id="bom-material-search"
+              type="search"
+              autocomplete="off"
+              [attr.placeholder]="'material.searchPlaceholder' | t"
+              [value]="bomMaterialSearch()"
+              (input)="bomMaterialSearch.set($any($event.target).value)"
+            />
+          </div>
+          <div formArrayName="bomLines">
+            @for (line of bomLines.controls; track $index; let i = $index) {
+              <div [formGroupName]="i" class="bom-line-row">
+                <div class="field line-material">
+                  <label [attr.for]="'bom-material-' + i">{{ 'material.entity' | t }}</label>
+                  <select [id]="'bom-material-' + i" formControlName="materialId" [disabled]="submitting()">
+                    <option value="">{{ 'food.bomSelectMaterial' | t }}</option>
+                    @for (m of filterMaterialsForBom(materials(), line.get('materialId')?.value, bomMaterialSearch()); track m.id ?? $index) {
+                      @if (m.id != null) {
+                        <option [value]="'' + m.id">{{ materialOptionLabel(m) }}</option>
+                      }
+                    }
+                  </select>
+                </div>
+                <div class="field line-qty">
+                  <label [attr.for]="'bom-qty-' + i">{{ 'food.bomQuantity' | t }}</label>
+                  <div class="qty-with-unit">
+                    <input [id]="'bom-qty-' + i" type="number" formControlName="quantity" min="0.0001" step="any" [readonly]="submitting()" />
+                    @if (bomMaterialUnit(materials(), line.get('materialId')?.value); as unit) {
+                      <span class="unit-tag">{{ unit }}</span>
+                    }
+                  </div>
+                </div>
+                <button type="button" class="btn-remove-line" [disabled]="submitting()" (click)="removeBomLine(i)">
+                  {{ 'common.remove' | t }}
+                </button>
+              </div>
+            }
+          </div>
+          <button type="button" class="btn-add-line" [disabled]="submitting()" (click)="addBomLine()">
+            {{ 'food.bomAddLine' | t }}
+          </button>
+        }
+      </fieldset>
+
       <div class="field" [class.invalid]="form.controls.version.invalid && form.controls.version.touched">
         <label for="food-edit-version">{{ 'common.version' | t }}</label>
         <input id="food-edit-version" type="number" formControlName="version" min="0" step="1" />

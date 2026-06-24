@@ -1,0 +1,144 @@
+<div class="page material-buy-page">
+  <a routerLink="/materials" class="back">{{ 'common.backTo' | t:{target: ('material.backMaterials' | t)} }}</a>
+  <h1>{{ 'material.buyTitle' | t }}</h1>
+  <p class="hint">{{ 'material.buyHint' | t }}</p>
+
+  <p class="hint-inline receipt-link">
+    {{ 'material.buyOrReceipt' | t }}
+    <a routerLink="/materials/import-receipt">{{ 'material.receiptImport' | t }}</a>
+  </p>
+
+  @if (errorMessage(); as msg) {
+    <p class="error-banner" role="alert">{{ msg }}</p>
+  }
+  @if (resultSummary(); as sum) {
+    <p class="success-banner" role="status">{{ sum }}</p>
+  }
+
+  @if (materials().length === 0) {
+    <p class="warn-banner">
+      {{ 'material.buyNoMaterials' | t }}
+      <a routerLink="/materials/new">{{ 'material.newMaterial' | t }}</a>
+    </p>
+  } @else {
+    <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+      <div class="field buy-from-field">
+        <label class="label-text" for="buy-from">{{ 'material.buyFrom' | t }}</label>
+        <input
+          id="buy-from"
+          type="text"
+          formControlName="buyFrom"
+          maxlength="255"
+          autocomplete="off"
+          [attr.placeholder]="'material.buyFromExample' | t"
+          [readonly]="submitting()"
+        />
+      </div>
+
+      <div class="pick-with-search">
+        <label class="label-text" for="buy-material-search">{{ 'material.buyFindMaterial' | t }}</label>
+        <input
+          id="buy-material-search"
+          type="search"
+          autocomplete="off"
+          [attr.placeholder]="'material.searchPlaceholder' | t"
+          [value]="materialSearch()"
+          (input)="materialSearch.set($any($event.target).value)"
+        />
+      </div>
+
+      <fieldset class="lines-block">
+        <legend>{{ 'material.buyLines' | t }}</legend>
+        <div formArrayName="lines">
+          @for (line of lines.controls; track $index; let i = $index) {
+            <div [formGroupName]="i" class="buy-line-row">
+              <div class="field line-material">
+                <label [attr.for]="'buy-mat-' + i">{{ 'material.entity' | t }}</label>
+                <select
+                  [id]="'buy-mat-' + i"
+                  formControlName="materialId"
+                  [disabled]="submitting()"
+                  (change)="onMaterialPicked(line)"
+                >
+                  <option value="">{{ 'material.buySelectMaterial' | t }}</option>
+                  @for (m of filterMaterials(materials(), line.get('materialId')?.value); track m.id ?? $index) {
+                    @if (m.id != null) {
+                      <option [value]="'' + m.id">{{ materialOptionLabel(m) }}</option>
+                    }
+                  }
+                </select>
+                @if (selectedMaterial(line.get('materialId')?.value); as sm) {
+                  <span class="balance-hint">
+                    {{ 'material.balance' | t }}: {{ readMaterialQuantity(sm) | number: '1.0-3' }} {{ sm.unit }}
+                  </span>
+                }
+              </div>
+              <div class="field line-brand">
+                <label [attr.for]="'buy-brand-' + i">{{ 'material.brand' | t }}</label>
+                <input
+                  [id]="'buy-brand-' + i"
+                  type="text"
+                  formControlName="brand"
+                  maxlength="255"
+                  autocomplete="off"
+                  [attr.placeholder]="'material.brandExample' | t"
+                  [readonly]="submitting()"
+                />
+              </div>
+              <div class="field line-qty">
+                <label [attr.for]="'buy-qty-' + i">{{ 'material.receiptQty' | t }}</label>
+                <input
+                  [id]="'buy-qty-' + i"
+                  type="number"
+                  formControlName="quantity"
+                  min="0.0001"
+                  step="any"
+                  [readonly]="submitting()"
+                />
+              </div>
+              <div class="field line-price">
+                <label [attr.for]="'buy-price-' + i">{{ 'material.currentPrice' | t }}</label>
+                <input
+                  [id]="'buy-price-' + i"
+                  type="number"
+                  formControlName="currentPrice"
+                  min="0"
+                  step="0.01"
+                  [readonly]="submitting()"
+                />
+              </div>
+              <div class="field line-total">
+                <span class="label-text">{{ 'material.buyLineTotal' | t }}</span>
+                <span class="mono line-total-val">
+                  {{ lineTotal(line.get('materialId')?.value, line.get('quantity')?.value, line.get('currentPrice')?.value) | number: '1.2-2' }}
+                </span>
+              </div>
+              <button
+                type="button"
+                class="btn-remove-line"
+                [disabled]="submitting() || lines.length <= 1"
+                (click)="removeLine(i)"
+              >
+                {{ 'common.remove' | t }}
+              </button>
+            </div>
+          }
+        </div>
+        <button type="button" class="btn-add-line" [disabled]="submitting()" (click)="addLine()">
+          {{ 'material.buyAddLine' | t }}
+        </button>
+      </fieldset>
+
+      <p class="purchase-total">
+        {{ 'material.buyGrandTotal' | t }}:
+        <strong class="mono">{{ purchaseTotal() | number: '1.2-2' }}</strong>
+      </p>
+
+      <div class="actions">
+        <button type="submit" [disabled]="submitting() || !canSubmit()">
+          {{ submitting() ? ('common.saving' | t) : ('material.buySubmit' | t) }}
+        </button>
+      </div>
+    </form>
+  }
+</div>

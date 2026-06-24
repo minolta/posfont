@@ -1,0 +1,108 @@
+<div class="material-list-page">
+  <h1>{{ 'material.title' | t }}</h1>
+  <p class="hint">{{ 'material.hint' | t }}</p>
+
+  @if (createdId(); as cid) {
+    <p class="success-banner">
+      {{ 'common.createdBanner' | t:{entity: ('material.entity' | t), id: cid} }}
+      <a routerLink="/materials">{{ 'common.dismiss' | t }}</a>
+    </p>
+  }
+  @if (updatedId(); as uid) {
+    <p class="success-banner success-banner--muted">
+      {{ 'common.updatedBanner' | t:{entity: ('material.entity' | t), id: uid} }}
+      <a routerLink="/materials">{{ 'common.dismiss' | t }}</a>
+    </p>
+  }
+  @if (importedCount(); as n) {
+    <p class="success-banner">
+      {{ 'material.receiptImportedBanner' | t:{count: n} }}
+      <a routerLink="/materials">{{ 'common.dismiss' | t }}</a>
+    </p>
+  }
+
+  <div class="toolbar">
+    <div class="search-field">
+      <label class="label-text" for="material-list-search">{{ 'common.search' | t }}</label>
+      <input
+        id="material-list-search"
+        type="search"
+        autocomplete="off"
+        [attr.placeholder]="'material.searchPlaceholder' | t"
+        [value]="searchTerm()"
+        (input)="onSearchInput($any($event.target).value)"
+      />
+    </div>
+    @if (loading()) {
+      <span class="status" aria-live="polite">{{ 'common.loading' | t }}</span>
+    }
+    <a routerLink="/materials/new" class="add-link">{{ 'material.newMaterial' | t }}</a>
+    <a routerLink="/materials/buy" class="add-link add-link--buy">{{ 'material.buyTitle' | t }}</a>
+    <a routerLink="/materials/import-receipt" class="add-link add-link--secondary">{{ 'material.receiptImport' | t }}</a>
+  </div>
+
+  @if (error(); as err) {
+    <p class="error" role="alert">{{ err }}</p>
+  }
+  @if (deleteError(); as delErr) {
+    <p class="error" role="alert">{{ delErr }}</p>
+  }
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>{{ 'common.id' | t }}</th>
+          <th>{{ 'common.code' | t }}</th>
+          <th>{{ 'common.name' | t }}</th>
+          <th>{{ 'material.unit' | t }}</th>
+          <th>{{ 'material.balance' | t }}</th>
+          <th>{{ 'material.currentPrice' | t }}</th>
+          <th>{{ 'material.brand' | t }}</th>
+          <th>{{ 'material.buyFrom' | t }}</th>
+          <th>{{ 'common.version' | t }}</th>
+          <th class="col-actions">{{ 'common.actions' | t }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        @if (loading() && materials().length === 0) {
+          <tr>
+            <td class="empty" colspan="10">{{ 'common.loading' | t }}</td>
+          </tr>
+        }
+        @for (m of materials(); track m.id ?? $index) {
+          <tr>
+            <td class="mono">{{ m.id }}</td>
+            <td class="mono">{{ m.code }}</td>
+            <td>{{ m.name }}</td>
+            <td class="mono">{{ m.unit }}</td>
+            <td class="mono">{{ readQty(m) | number: '1.0-3' }}</td>
+            <td class="mono">{{ readPrice(m) | number: '1.2-2' }}</td>
+            <td>{{ readBrand(m) || '—' }}</td>
+            <td>{{ readBuyFrom(m) || '—' }}</td>
+            <td class="mono">{{ m.version }}</td>
+            <td class="col-actions">
+              @if (m.id != null) {
+                <a [routerLink]="['/materials', m.id, 'edit']" class="edit-link">{{ 'common.edit' | t }}</a>
+                <button
+                  type="button"
+                  class="delete-btn"
+                  [disabled]="deletingId() === m.id"
+                  (click)="deleteMaterial(m)"
+                >
+                  {{ deletingId() === m.id ? ('common.deleting' | t) : ('common.delete' | t) }}
+                </button>
+              }
+            </td>
+          </tr>
+        } @empty {
+          @if (!loading()) {
+            <tr>
+              <td class="empty" colspan="10">{{ 'common.noResults' | t:{entity: ('nav.materials' | t)} }}</td>
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+  </div>
+</div>

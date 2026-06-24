@@ -28,6 +28,15 @@ export interface FoodCategoryRequest {
   version: number;
 }
 
+/** Matches `me.pixka.pos.food.model.FoodBomLine` JSON nested under foods. */
+export interface FoodBomLine {
+  id: number | null;
+  material: import('../material/material.model').Material | null;
+  quantity: number;
+}
+
+export type { Material } from '../material/material.model';
+
 /** Matches `me.pixka.pos.food.model.Food` JSON from `/api/foods`. */
 export interface Food {
   id: number | null;
@@ -45,6 +54,14 @@ export interface Food {
    * Alias keys: `block_order_line` on some APIs.
    */
   blockOrderLine?: boolean | null;
+  /** Recipe / bill of materials lines. */
+  bomLines?: FoodBomLine[];
+}
+
+/** One BOM row in `POST`/`PUT` food JSON. */
+export interface FoodBomLineRequest {
+  materialId: number;
+  quantity: number;
 }
 
 /** Body for `POST /api/foods` and `PUT /api/foods/{id}` (`FoodRequest`). */
@@ -57,6 +74,8 @@ export interface FoodRequest {
   version: number;
   /** Omit or false to allow ordering; true blocks new/edited order lines from this food. */
   blockOrderLine?: boolean;
+  /** Recipe ingredients; send full list to replace existing BOM on update. */
+  bomLines?: FoodBomLineRequest[];
 }
 
 /** Normalizes booleans — JSON aliases from Java / legacy payloads. */

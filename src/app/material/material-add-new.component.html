@@ -1,0 +1,66 @@
+<div class="page">
+  <a routerLink="/materials" class="back">{{ 'common.backTo' | t:{target: ('material.backMaterials' | t)} }}</a>
+  <h1>{{ 'material.addTitle' | t }}</h1>
+  <p class="hint">{{ 'material.addHint' | t }}</p>
+  <p class="hint-inline">
+    <a routerLink="/materials/buy">{{ 'material.buyTitle' | t }}</a>
+    ·
+    <a routerLink="/materials/import-receipt">{{ 'material.receiptImport' | t }}</a>
+  </p>
+
+  @if (errorMessage(); as msg) {
+    <p class="error-banner" role="alert">{{ msg }}</p>
+  }
+
+  <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    <div class="field" [class.invalid]="form.controls.code.invalid && form.controls.code.touched">
+      <label for="mat-code">{{ 'common.code' | t }}</label>
+      <input id="mat-code" type="text" formControlName="code" autocomplete="off" [attr.placeholder]="'material.codeExample' | t" [readonly]="submitting()" />
+      @if (form.controls.code.invalid && form.controls.code.touched) {
+        <span class="err">{{ 'common.required' | t:{field: ('common.code' | t)} }}</span>
+      }
+    </div>
+
+    <div class="field" [class.invalid]="form.controls.name.invalid && form.controls.name.touched">
+      <label for="mat-name">{{ 'common.name' | t }}</label>
+      <input id="mat-name" type="text" formControlName="name" autocomplete="off" [attr.placeholder]="'material.nameExample' | t" [readonly]="submitting()" />
+      @if (form.controls.name.invalid && form.controls.name.touched) {
+        <span class="err">{{ 'common.required' | t:{field: ('common.name' | t)} }}</span>
+      }
+    </div>
+
+    <div class="field" [class.invalid]="form.controls.unit.invalid && form.controls.unit.touched">
+      <label for="mat-unit">{{ 'material.unit' | t }}</label>
+      <input id="mat-unit" type="text" formControlName="unit" autocomplete="off" maxlength="20" [attr.placeholder]="'material.unitExample' | t" [readonly]="submitting()" />
+      @if (form.controls.unit.invalid && form.controls.unit.touched) {
+        <span class="err">{{ 'material.unitRequired' | t }}</span>
+      }
+    </div>
+
+    <div class="field">
+      <label for="mat-qty">{{ 'material.balance' | t }}</label>
+      <input id="mat-qty" type="number" formControlName="quantity" min="0" step="any" [readonly]="submitting()" />
+    </div>
+
+    <div class="field">
+      <label for="mat-price">{{ 'material.currentPrice' | t }}</label>
+      <input id="mat-price" type="number" formControlName="currentPrice" min="0" step="0.01" [readonly]="submitting()" />
+    </div>
+
+    <div class="field">
+      <label for="mat-brand">{{ 'material.brand' | t }}</label>
+      <input id="mat-brand" type="text" formControlName="brand" maxlength="255" autocomplete="off" [attr.placeholder]="'material.brandExample' | t" [readonly]="submitting()" />
+    </div>
+
+    <div class="field">
+      <label for="mat-buy-from">{{ 'material.buyFrom' | t }}</label>
+      <input id="mat-buy-from" type="text" formControlName="buyFrom" maxlength="255" autocomplete="off" [attr.placeholder]="'material.buyFromExample' | t" [readonly]="submitting()" />
+    </div>
+
+    <div class="actions">
+      <button type="submit" [disabled]="submitting() || form.invalid">
+        {{ submitting() ? ('common.saving' | t) : ('material.createMaterial' | t) }}
+      </button>
+    </div>
+  </form>
+</div>

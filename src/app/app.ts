@@ -21,7 +21,11 @@ const NAV_LINKS: NavLink[] = [
   { path: '/orders', labelKey: 'nav.orders' },
   { path: '/orders/new', labelKey: 'nav.newOrder' },
   { path: '/foods', labelKey: 'nav.foods' },
+  { path: '/boms', labelKey: 'nav.boms' },
   { path: '/foods/new', labelKey: 'nav.addFood' },
+  { path: '/materials', labelKey: 'nav.materials' },
+  { path: '/materials/buy', labelKey: 'nav.buyMaterial' },
+  { path: '/materials/new', labelKey: 'nav.addMaterial' },
   { path: '/food-categories', labelKey: 'nav.categories' },
   { path: '/food-categories/new', labelKey: 'nav.newCategory' },
   { path: '/kitchens', labelKey: 'nav.kitchens' },
@@ -71,6 +75,12 @@ function normalizeNavPath(url: string): string {
   }
   if (path.startsWith('/foods/')) {
     return '/foods';
+  }
+  if (path.startsWith('/boms/')) {
+    return '/boms';
+  }
+  if (path.startsWith('/materials/')) {
+    return '/materials';
   }
   if (path.startsWith('/food-categories/')) {
     return '/food-categories';

@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
   catchError,
@@ -18,6 +18,16 @@ import {
 import { FoodCategoryService } from '../food-category/food-category.service';
 import { LocaleService } from '../i18n/locale.service';
 import { TranslatePipe } from '../i18n/translate.pipe';
+import { MaterialService } from '../material/material.service';
+import type { Material } from '../material/material.model';
+import {
+  bomMaterialUnit,
+  buildBomLineRequests,
+  filterMaterialsForBom,
+  materialOptionLabel,
+  newBomLineGroup,
+  rebuildBomLinesForm,
+} from './food-bom-form.util';
 import { foodBlocksOrderLines, type Food, type FoodCategory, type Kitchen } from './food.model';
 import { FoodService } from './food.service';
 import { KitchenService } from '../kitchen/kitchen.service';
@@ -37,6 +47,7 @@ export class FoodEditComponent {
   private readonly foodService = inject(FoodService);
   private readonly kitchenService = inject(KitchenService);
   private readonly foodCategoryService = inject(FoodCategoryService);
+  private readonly materialService = inject(MaterialService);
   private readonly i18n = inject(LocaleService);
 
   readonly loading = signal(true);
@@ -102,6 +113,12 @@ export class FoodEditComponent {
 
   readonly kitchenSearch = signal('');
   readonly categorySearch = signal('');
+  readonly bomMaterialSearch = signal('');
+
+  readonly materials = toSignal(
+    this.materialService.getMaterials().pipe(catchError(() => of([] as Material[]))),
+    { initialValue: [] as Material[] },
+  );
 
   readonly submitting = signal(false);
   readonly saveError = signal<string | null>(null);
@@ -116,7 +133,16 @@ export class FoodEditComponent {
     manualKitchenQuery: [''],
     foodCategoryId: ['', Validators.required],
     version: [0, [Validators.required, Validators.min(0)]],
+    bomLines: this.fb.array<FormGroup>([]),
   });
+
+  get bomLines(): FormArray<FormGroup> {
+    return this.form.get('bomLines') as FormArray<FormGroup>;
+  }
+
+  readonly materialOptionLabel = materialOptionLabel;
+  readonly filterMaterialsForBom = filterMaterialsForBom;
+  readonly bomMaterialUnit = bomMaterialUnit;
 
   constructor() {
     this.route.paramMap
@@ -175,6 +201,7 @@ export class FoodEditComponent {
           foodCategoryId: cid != null ? String(cid) : '',
           version: food.version,
         });
+        rebuildBomLinesForm(this.fb, this.bomLines, food.bomLines);
       });
   }
 
@@ -277,6 +304,14 @@ export class FoodEditComponent {
       });
   }
 
+  addBomLine(): void {
+    this.bomLines.push(newBomLineGroup(this.fb));
+  }
+
+  removeBomLine(index: number): void {
+    this.bomLines.removeAt(index);
+  }
+
   canSubmitForm(): boolean {
     const f = this.form;
     if (
@@ -291,9 +326,16 @@ export class FoodEditComponent {
     const lists = this.lookups();
     if (lists.kitchens.length > 0) {
       const id = Number(f.getRawValue().kitchenId);
-      return Number.isFinite(id) && id >= 1;
+      if (!Number.isFinite(id) || id < 1) {
+        return false;
+      }
+    } else if ((f.getRawValue().manualKitchenQuery ?? '').trim().length === 0) {
+      return false;
     }
-    return (f.getRawValue().manualKitchenQuery ?? '').trim().length > 0;
+    if (this.bomLines.length > 0 && this.bomLines.invalid) {
+      return false;
+    }
+    return true;
   }
 
   submit(): void {
@@ -325,6 +367,7 @@ export class FoodEditComponent {
             foodCategoryId,
             version: Number(v.version),
             blockOrderLine: !!v.blockOrderLine,
+            bomLines: buildBomLineRequests(this.bomLines),
           }),
         ),
         finalize(() => this.submitting.set(false)),

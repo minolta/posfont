@@ -1,0 +1,128 @@
+@import './material-add-new.component.css';
+
+.upload-block {
+  margin-bottom: 1.25rem;
+  padding: 1rem;
+  border: 1px dashed #c8c8c8;
+  border-radius: 8px;
+  background: #fafafa;
+}
+
+.upload-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #444;
+  margin-bottom: 0.5rem;
+}
+
+.receipt-preview {
+  display: block;
+  max-width: 100%;
+  max-height: 280px;
+  margin-top: 0.75rem;
+  border-radius: 6px;
+  border: 1px solid #e2e2e2;
+  object-fit: contain;
+}
+
+.review-block {
+  margin-top: 1rem;
+}
+
+.review-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.35rem;
+}
+
+.review-toolbar h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.check-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid #e2e2e2;
+  border-radius: 8px;
+  background: #fff;
+  margin: 0.75rem 0 1rem;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.45rem 0.55rem;
+  border-bottom: 1px solid #eee;
+  vertical-align: middle;
+}
+
+th {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #555;
+  background: #f8f8f8;
+}
+
+td input[type='text'] {
+  width: 100%;
+  min-width: 5rem;
+  font: inherit;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid #d4d4d4;
+  border-radius: 4px;
+}
+
+.col-check {
+  width: 2rem;
+  text-align: center;
+}
+
+.success-banner {
+  margin: 0 0 1rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  background: #ecfdf5;
+  color: #065f46;
+  font-size: 0.9rem;
+}
+
+.ocr-raw {
+  margin-top: 1.5rem;
+  font-size: 0.85rem;
+}
+
+.ocr-raw pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 200px;
+  overflow: auto;
+  padding: 0.65rem;
+  background: #f4f4f5;
+  border-radius: 6px;
+}
+
+.status {
+  margin: 0.5rem 0 0;
+  font-size: 0.875rem;
+  color: #5c5c5c;
+}

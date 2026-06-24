@@ -1,0 +1,63 @@
+<div class="page">
+  <a routerLink="/materials" class="back">{{ 'common.backTo' | t:{target: ('material.backMaterials' | t)} }}</a>
+  <h1>{{ 'material.editTitle' | t }}</h1>
+  <p class="hint">{{ 'material.editHint' | t }}</p>
+
+  @if (loading()) {
+    <p class="status">{{ 'common.loading' | t }}</p>
+  } @else if (loadError(); as le) {
+    <p class="error-banner" role="alert">{{ le }}</p>
+  } @else {
+    @if (saveError(); as se) {
+      <p class="error-banner" role="alert">{{ se }}</p>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="submit()">
+      <div class="field" [class.invalid]="form.controls.code.invalid && form.controls.code.touched">
+        <label for="mat-edit-code">{{ 'common.code' | t }}</label>
+        <input id="mat-edit-code" type="text" formControlName="code" autocomplete="off" [readonly]="submitting()" />
+      </div>
+
+      <div class="field" [class.invalid]="form.controls.name.invalid && form.controls.name.touched">
+        <label for="mat-edit-name">{{ 'common.name' | t }}</label>
+        <input id="mat-edit-name" type="text" formControlName="name" autocomplete="off" [readonly]="submitting()" />
+      </div>
+
+      <div class="field" [class.invalid]="form.controls.unit.invalid && form.controls.unit.touched">
+        <label for="mat-edit-unit">{{ 'material.unit' | t }}</label>
+        <input id="mat-edit-unit" type="text" formControlName="unit" maxlength="20" autocomplete="off" [readonly]="submitting()" />
+      </div>
+
+      <div class="field">
+        <label for="mat-edit-qty">{{ 'material.balance' | t }}</label>
+        <input id="mat-edit-qty" type="number" formControlName="quantity" min="0" step="any" [readonly]="submitting()" />
+      </div>
+
+      <div class="field">
+        <label for="mat-edit-price">{{ 'material.currentPrice' | t }}</label>
+        <input id="mat-edit-price" type="number" formControlName="currentPrice" min="0" step="0.01" [readonly]="submitting()" />
+      </div>
+
+      <div class="field">
+        <label for="mat-edit-brand">{{ 'material.brand' | t }}</label>
+        <input id="mat-edit-brand" type="text" formControlName="brand" maxlength="255" autocomplete="off" [readonly]="submitting()" />
+      </div>
+
+      <div class="field">
+        <label for="mat-edit-buy-from">{{ 'material.buyFrom' | t }}</label>
+        <input id="mat-edit-buy-from" type="text" formControlName="buyFrom" maxlength="255" autocomplete="off" [readonly]="submitting()" />
+      </div>
+
+      <div class="field" [class.invalid]="form.controls.version.invalid && form.controls.version.touched">
+        <label for="mat-edit-version">{{ 'common.version' | t }}</label>
+        <input id="mat-edit-version" type="number" formControlName="version" min="0" step="1" [readonly]="submitting()" />
+      </div>
+
+      <div class="actions">
+        <button type="submit" [disabled]="submitting() || form.invalid">
+          {{ submitting() ? ('common.saving' | t) : ('common.saveChanges' | t) }}
+        </button>
+      </div>
+    </form>
+  }
+</div>

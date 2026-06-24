@@ -1,13 +1,22 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { catchError, finalize, forkJoin, map, Observable, of, switchMap, throwError } from 'rxjs';
 
 import { FoodCategoryService } from '../food-category/food-category.service';
 import { LocaleService } from '../i18n/locale.service';
 import { TranslatePipe } from '../i18n/translate.pipe';
+import { MaterialService } from '../material/material.service';
+import type { Material } from '../material/material.model';
+import {
+  bomMaterialUnit,
+  buildBomLineRequests,
+  filterMaterialsForBom,
+  materialOptionLabel,
+  newBomLineGroup,
+} from './food-bom-form.util';
 import type { FoodCategory, Kitchen } from './food.model';
 import { FoodService } from './food.service';
 import { KitchenService } from '../kitchen/kitchen.service';
@@ -25,6 +34,7 @@ export class FoodAddNewComponent {
   private readonly foodService = inject(FoodService);
   private readonly kitchenService = inject(KitchenService);
   private readonly foodCategoryService = inject(FoodCategoryService);
+  private readonly materialService = inject(MaterialService);
   private readonly router = inject(Router);
   private readonly i18n = inject(LocaleService);
 
@@ -88,6 +98,12 @@ export class FoodAddNewComponent {
   readonly kitchenSearch = signal('');
   /** Filters category `<select>` options (name, code, or id substring, case-insensitive). */
   readonly categorySearch = signal('');
+  readonly bomMaterialSearch = signal('');
+
+  readonly materials = toSignal(
+    this.materialService.getMaterials().pipe(catchError(() => of([] as Material[]))),
+    { initialValue: [] as Material[] },
+  );
 
   readonly submitting = signal(false);
   readonly errorMessage = signal<string | null>(null);
@@ -106,7 +122,16 @@ export class FoodAddNewComponent {
     manualKitchenQuery: [''],
     foodCategoryId: ['', Validators.required],
     version: [0, [Validators.required, Validators.min(0)]],
+    bomLines: this.fb.array<FormGroup>([]),
   });
+
+  get bomLines(): FormArray<FormGroup> {
+    return this.form.get('bomLines') as FormArray<FormGroup>;
+  }
+
+  readonly materialOptionLabel = materialOptionLabel;
+  readonly filterMaterialsForBom = filterMaterialsForBom;
+  readonly bomMaterialUnit = bomMaterialUnit;
 
   filterKitchens(ks: Kitchen[]): Kitchen[] {
     const q = this.kitchenSearch().trim().toLowerCase();
@@ -183,6 +208,14 @@ export class FoodAddNewComponent {
   }
 
   /** Enables the submit button: core fields valid + kitchen resolved (select or manual lookup text). */
+  addBomLine(): void {
+    this.bomLines.push(newBomLineGroup(this.fb));
+  }
+
+  removeBomLine(index: number): void {
+    this.bomLines.removeAt(index);
+  }
+
   canSubmitForm(): boolean {
     const f = this.form;
     if (
@@ -197,9 +230,16 @@ export class FoodAddNewComponent {
     const lists = this.lookups();
     if (lists.kitchens.length > 0) {
       const id = Number(f.getRawValue().kitchenId);
-      return Number.isFinite(id) && id >= 1;
+      if (!Number.isFinite(id) || id < 1) {
+        return false;
+      }
+    } else if ((f.getRawValue().manualKitchenQuery ?? '').trim().length === 0) {
+      return false;
     }
-    return (f.getRawValue().manualKitchenQuery ?? '').trim().length > 0;
+    if (this.bomLines.length > 0 && this.bomLines.invalid) {
+      return false;
+    }
+    return true;
   }
 
   submit(): void {
@@ -231,6 +271,7 @@ export class FoodAddNewComponent {
               foodCategoryId,
               version: Number(v.version),
               blockOrderLine: !!v.blockOrderLine,
+              bomLines: buildBomLineRequests(this.bomLines),
             })
             .pipe(
               switchMap((created) => {

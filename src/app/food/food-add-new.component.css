@@ -1,8 +1,5 @@
-.page {
-  max-width: 520px;
-  margin: 0 auto;
-  padding: 1.25rem 1rem 2rem;
-}
+@import './food-edit.component.css';
+
 
 h1 {
   font-size: 1.5rem;

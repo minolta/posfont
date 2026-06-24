@@ -1,0 +1,198 @@
+<div class="bom-page">
+  <div class="bom-header">
+    <h1>{{ 'bom.title' | t }}</h1>
+    <p class="hint">{{ 'bom.hint' | t }}</p>
+  </div>
+
+  @if (loading() && foods().length === 0) {
+    <p class="status-loading">{{ 'common.loading' | t }}</p>
+  } @else if (error(); as err) {
+    <p class="error-banner" role="alert">{{ err }}</p>
+  } @else {
+    <div class="bom-layout">
+      <!-- Master Panel (Left side: Foods List) -->
+      <aside class="bom-master-panel">
+        <div class="search-wrap">
+          <label class="sr-only" for="food-search">{{ 'bom.searchFood' | t }}</label>
+          <input
+            id="food-search"
+            type="search"
+            [placeholder]="'bom.searchFood' | t"
+            [value]="searchTerm()"
+            (input)="searchTerm.set($any($event.target).value)"
+            autocomplete="off"
+          />
+        </div>
+
+        <div class="category-chips-wrap">
+          <button
+            type="button"
+            class="chip"
+            [class.chip--active]="selectedCategoryId() === null"
+            (click)="selectedCategoryId.set(null)"
+          >
+            {{ 'common.all' | t }}
+          </button>
+          @for (c of categories(); track c.id ?? c.code) {
+            @if (c.id != null) {
+              <button
+                type="button"
+                class="chip"
+                [class.chip--active]="selectedCategoryId() === c.id"
+                (click)="selectedCategoryId.set(c.id)"
+              >
+                {{ categoryName(c) }}
+              </button>
+            }
+          }
+        </div>
+
+        <div class="foods-list">
+          @for (food of filteredFoods(); track food.id ?? food.code) {
+            <button
+              type="button"
+              class="food-item"
+              [class.food-item--active]="selectedFood()?.id === food.id"
+              (click)="selectFood(food)"
+            >
+              <div class="food-item-meta">
+                <span class="food-code">{{ food.code }}</span>
+                <span class="food-name">{{ food.name || ('common.emptyDash' | t) }}</span>
+              </div>
+              <div class="food-item-badge">
+                @if (food.bomLines && food.bomLines.length > 0) {
+                  <span class="badge badge--configured" [attr.title]="'bom.statusConfigured' | t:{count: food.bomLines.length}">
+                    {{ food.bomLines.length }}
+                  </span>
+                } @else {
+                  <span class="badge badge--none" [attr.title]="'bom.statusNone' | t">
+                    —
+                  </span>
+                }
+              </div>
+            </button>
+          } @empty {
+            <p class="foods-list-empty">{{ 'common.noResults' | t:{entity: ('nav.foods' | t)} }}</p>
+          }
+        </div>
+      </aside>
+
+      <!-- Detail Panel (Right side: BOM Editor) -->
+      <section class="bom-detail-panel">
+        @if (selectedFood(); as food) {
+          <div class="editor-header">
+            <div class="food-info">
+              <span class="editor-label">Recipe for</span>
+              <h2>{{ food.name || food.code }}</h2>
+              <span class="food-meta-tag">{{ food.code }} &bull; {{ food.foodCategory?.code || 'No Category' }}</span>
+            </div>
+          </div>
+
+          @if (errorMessage(); as msg) {
+            <p class="error-banner" role="alert">{{ msg }}</p>
+          }
+          @if (successMessage(); as msg) {
+            <p class="success-banner" role="alert">{{ msg }}</p>
+          }
+
+          <form [formGroup]="form" (ngSubmit)="submit()" class="editor-form">
+            <fieldset class="bom-lines-fieldset">
+              <legend class="sr-only">{{ 'food.bomTitle' | t }}</legend>
+
+              <div class="material-search-row">
+                <label for="editor-material-search" class="label-text">{{ 'food.bomFindMaterial' | t }}</label>
+                <input
+                  id="editor-material-search"
+                  type="search"
+                  [placeholder]="'material.searchPlaceholder' | t"
+                  [value]="bomMaterialSearch()"
+                  (input)="bomMaterialSearch.set($any($event.target).value)"
+                  autocomplete="off"
+                />
+              </div>
+
+              @if (materials().length === 0) {
+                <div class="no-materials-alert">
+                  <p>{{ 'food.bomNoMaterials' | t }}</p>
+                  <a routerLink="/materials/new" class="btn-primary-link">{{ 'material.newMaterial' | t }}</a>
+                </div>
+              } @else {
+                <div formArrayName="bomLines" class="bom-lines-list">
+                  @for (line of bomLines.controls; track $index; let i = $index) {
+                    <div [formGroupName]="i" class="bom-line-row">
+                      <div class="col-material">
+                        <label [attr.for]="'bom-material-' + i" class="sr-only">{{ 'material.entity' | t }}</label>
+                        <select [id]="'bom-material-' + i" formControlName="materialId">
+                          <option value="">{{ 'food.bomSelectMaterial' | t }}</option>
+                          @for (m of filterMaterialsForBom(materials(), line.get('materialId')?.value, bomMaterialSearch()); track m.id ?? $index) {
+                            @if (m.id != null) {
+                              <option [value]="'' + m.id">{{ materialOptionLabel(m) }}</option>
+                            }
+                          }
+                        </select>
+                      </div>
+
+                      <div class="col-qty">
+                        <label [attr.for]="'bom-qty-' + i" class="sr-only">{{ 'food.bomQuantity' | t }}</label>
+                        <div class="qty-input-wrap">
+                          <input
+                            [id]="'bom-qty-' + i"
+                            type="number"
+                            formControlName="quantity"
+                            min="0.0001"
+                            step="any"
+                            placeholder="Qty"
+                          />
+                          @if (bomMaterialUnit(materials(), line.get('materialId')?.value); as unit) {
+                            <span class="unit-suffix">{{ unit }}</span>
+                          }
+                        </div>
+                      </div>
+
+                      <div class="col-action">
+                        <button
+                          type="button"
+                          class="btn-remove"
+                          (click)="removeBomLine(i)"
+                          [attr.aria-label]="'common.remove' | t"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="icon-trash">
+                            <path fill-rule="evenodd" d="M8.75 3A.75.75 0 0 0 8 3.75V5H4.333c-.08 0-.16.003-.238.008a.75.75 0 0 0-.25 1.48L5.3 16.51A2.25 2.25 0 0 0 7.53 18.5h4.94a2.25 2.25 0 0 0 2.23-1.99l1.448-10.022a.75.75 0 0 0-.488-.822.75.75 0 0 0-.25-.008H12V3.75A.75.75 0 0 0 11.25 3h-2.5ZM10.5 8.25a.75.75 0 0 0-1.5 0v6.5a.75.75 0 0 0 1.5 0v-6.5Zm2.75 0a.75.75 0 0 0-1.5 0v6.5a.75.75 0 0 0 1.5 0v-6.5Z" clip-rule="evenodd" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  }
+
+                  @if (bomLines.length === 0) {
+                    <p class="bom-lines-empty">No ingredients added yet. Add materials to configure the recipe.</p>
+                  }
+                </div>
+
+                <div class="form-actions">
+                  <button type="button" class="btn-secondary" (click)="addBomLine()">
+                    {{ 'food.bomAddLine' | t }}
+                  </button>
+                  <button type="submit" class="btn-primary" [disabled]="!canSubmit()">
+                    {{ loading() ? ('common.saving' | t) : ('common.saveChanges' | t) }}
+                  </button>
+                </div>
+              }
+            </fieldset>
+          </form>
+        } @else {
+          <!-- Empty State (No Food Selected) -->
+          <div class="empty-state">
+            <div class="empty-state-card">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="empty-icon">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
+              </svg>
+              <h3>{{ 'bom.title' | t }}</h3>
+              <p>{{ 'bom.selectFoodPrompt' | t }}</p>
+            </div>
+          </div>
+        }
+      </section>
+    </div>
+  }
+</div>
